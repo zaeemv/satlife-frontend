@@ -8,6 +8,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   login: (username: string, password: string) => Promise<void>;
   logout: () => void;
+  hasAccess: (roles?: string[], permissions?: string[]) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,10 +32,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (username: string, password: string) => {
     const apiUrl = 'http://127.0.0.1:8000/api';
+
+    // ✅ Create form-encoded body (IMPORTANT)
+    const formData = new URLSearchParams();
+    formData.append('username', username);
+    formData.append('password', password);
+
     const response = await fetch(`${apiUrl}/auth/login`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData, // ✅ NOT JSON.stringify
     });
 
     if (!response.ok) {
@@ -42,11 +51,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const data = await response.json();
+
+    // ✅ Store token
     localStorage.setItem('token', data.access_token);
 
-    // Fetch user info using the token
-    const userResponse = await fetch(`${apiUrl}/users/me`, {
-      headers: { Authorization: `Bearer ${data.access_token}` },
+    // Optional (like your pet project)
+    document.cookie = `token=${data.access_token}; path=/;`;
+
+    // Fetch user info using token
+    const userResponse = await fetch(`${apiUrl}/auth/me/`, {
+      headers: {
+        Authorization: `Bearer ${data.access_token}`,
+      },
     });
 
     if (!userResponse.ok) {
@@ -54,8 +70,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const userData = await userResponse.json();
+
     setUser(userData);
     localStorage.setItem('sat-user', JSON.stringify(userData));
+
   }, []);
 
   const logout = useCallback(() => {
@@ -64,13 +82,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('token');
   }, []);
 
+  const hasAccess = () => true; // Placeholder for actual access control logic
+
   if (!mounted) return null;
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout, hasAccess }}>
       {children}
     </AuthContext.Provider>
   );
+
+
 }
 
 export function useAuth() {

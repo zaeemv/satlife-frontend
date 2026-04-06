@@ -22,7 +22,7 @@ import {
 const PIE_COLORS = ['oklch(0.62 0.15 250)', 'oklch(0.55 0.14 250)', 'oklch(0.65 0.15 165)', 'oklch(0.70 0.18 45)', 'oklch(0.55 0.2 15)'];
 
 export default function DashboardPage() {
-  const { projects, orders, inventory, maintenance, loading } = useDataStore();
+  const { projects, orders, inventory, maintenanceLogs, loading } = useDataStore();
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -32,7 +32,7 @@ export default function DashboardPage() {
   const inProgressProjects = projects.filter((p) => p.status_id && p.status_id.toString().includes('2')).length;
   const totalOrders = orders.length;
   const inventoryItems = inventory.reduce((sum, item) => sum + item.quantity, 0);
-  const maintenanceRecords = maintenance.length;
+  const maintenanceRecords = maintenanceLogs.length;
 
   // Project status distribution (dummy calculation for demo)
   const projectStatusData = [
@@ -96,7 +96,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Maintenance Records</CardTitle>
+            <CardTitle className="text-sm font-medium">maintenanceLogs Records</CardTitle>
             <Wrench className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>

@@ -22,7 +22,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { StatusBadge } from "@/components/status-badge";
 import { SystemTree } from "@/components/system-tree";
-import { MaintenanceTimeline } from "@/components/maintenance-timeline";
+import { MaintenanceTimeline } from "@/components/maintenanceLogs-timeline";
 import { projects, systems, maintenanceLogs, orders } from "@/lib/dummy-data";
 
 export default function ProjectDetailPage() {
@@ -151,11 +151,11 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Project Maintenance Logs */}
+      {/* Project maintenanceLogs Logs */}
       <Card className="shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold text-card-foreground">
-            Maintenance History ({projectMaintenanceLogs.length})
+            maintenanceLogs History ({projectMaintenanceLogs.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -163,7 +163,7 @@ export default function ProjectDetailPage() {
         </CardContent>
       </Card>
 
-      {/* Entity Maintenance Modal */}
+      {/* Entity maintenanceLogs Modal */}
       <Dialog
         open={!!maintenanceModal}
         onOpenChange={() => setMaintenanceModal(null)}
@@ -171,7 +171,7 @@ export default function ProjectDetailPage() {
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-foreground">
-              Maintenance: {maintenanceModal?.entityName}
+              maintenanceLogs: {maintenanceModal?.entityName}
             </DialogTitle>
           </DialogHeader>
           <MaintenanceTimeline logs={entityLogs} />

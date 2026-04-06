@@ -14,7 +14,7 @@ export function MaintenanceTimeline({ logs }: { logs: MaintenanceLog[] }) {
   if (logs.length === 0) {
     return (
       <p className="text-sm text-muted-foreground py-4">
-        No maintenance history for this entity.
+        No maintenanceLogs history for this entity.
       </p>
     );
   }

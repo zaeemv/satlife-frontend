@@ -8,7 +8,7 @@ export type EntityStatus =
   | "Installed"
   | "Testing"
   | "Failed"
-  | "Under Maintenance"
+  | "Under maintenanceLogs"
   | "Replaced"
   | "Retired";
 
@@ -17,7 +17,7 @@ export type ProjectStatus =
   | "Building"
   | "Testing"
   | "Delivered"
-  | "Maintenance";
+  | "maintenanceLogs";
 
 export type OrderStatus = "Pending" | "Approved" | "Rejected";
 
@@ -78,7 +78,7 @@ export interface SatComponent {
 }
 
 function generateComponents(unitId: string, baseName: string, count: number): SatComponent[] {
-  const statuses: EntityStatus[] = ["Available", "Installed", "Testing", "Failed", "Under Maintenance"];
+  const statuses: EntityStatus[] = ["Available", "Installed", "Testing", "Failed", "Under maintenanceLogs"];
   return Array.from({ length: count }, (_, i) => ({
     id: `${unitId}-CMP-${String(i + 1).padStart(3, "0")}`,
     name: `${baseName} Component ${i + 1}`,
@@ -97,7 +97,7 @@ export interface Unit {
 }
 
 function generateUnits(moduleId: string, baseName: string, count: number): Unit[] {
-  const statuses: EntityStatus[] = ["Installed", "Available", "Testing", "Under Maintenance", "Failed"];
+  const statuses: EntityStatus[] = ["Installed", "Available", "Testing", "Under maintenanceLogs", "Failed"];
   return Array.from({ length: count }, (_, i) => ({
     id: `${moduleId}-U-${String(i + 1).padStart(2, "0")}`,
     name: `${baseName} Unit ${i + 1}`,
@@ -117,7 +117,7 @@ export interface Module {
 }
 
 function generateModules(subsystemId: string, baseName: string, count: number): Module[] {
-  const statuses: EntityStatus[] = ["Installed", "Testing", "Available", "Failed", "Under Maintenance"];
+  const statuses: EntityStatus[] = ["Installed", "Testing", "Available", "Failed", "Under maintenanceLogs"];
   return Array.from({ length: count }, (_, i) => ({
     id: `${subsystemId}-M-${String(i + 1).padStart(2, "0")}`,
     name: `${baseName} Module ${i + 1}`,
@@ -138,7 +138,7 @@ export interface Subsystem {
 }
 
 function generateSubsystems(systemId: string, baseName: string, types: string[]): Subsystem[] {
-  const statuses: EntityStatus[] = ["Installed", "Testing", "Available", "Under Maintenance"];
+  const statuses: EntityStatus[] = ["Installed", "Testing", "Available", "Under maintenanceLogs"];
   return types.map((type, i) => ({
     id: `${systemId}-SS-${String(i + 1).padStart(2, "0")}`,
     name: `${type}`,
@@ -205,10 +205,10 @@ export const projects: Project[] = [
   { id: "PRJ-003", name: "EO Sat Charlie", orderId: "ORD-003", status: "Building", deliveryDate: "2026-03-20", systemIds: ["SYS-008", "SYS-009", "SYS-010"] },
   { id: "PRJ-004", name: "Mars Relay Delta", orderId: "ORD-004", status: "Planning", deliveryDate: "2026-08-01", systemIds: ["SYS-011", "SYS-012"] },
   { id: "PRJ-005", name: "Deep Probe Echo", orderId: "ORD-005", status: "Delivered", deliveryDate: "2025-07-30", systemIds: ["SYS-013", "SYS-014", "SYS-015"] },
-  { id: "PRJ-006", name: "DefenseSat Foxtrot", orderId: "ORD-007", status: "Maintenance", deliveryDate: "2025-04-10", systemIds: ["SYS-016", "SYS-017", "SYS-018", "SYS-019", "SYS-020"] },
+  { id: "PRJ-006", name: "DefenseSat Foxtrot", orderId: "ORD-007", status: "maintenanceLogs", deliveryDate: "2025-04-10", systemIds: ["SYS-016", "SYS-017", "SYS-018", "SYS-019", "SYS-020"] },
 ];
 
-// ---------- MAINTENANCE LOGS ----------
+// ---------- maintenanceLogs LOGS ----------
 export interface MaintenanceLog {
   id: string;
   projectId: string;
@@ -256,7 +256,7 @@ export const inventory: InventoryItem[] = [
   { id: "INV-004", name: "Li-Ion Battery Pack", type: "Subsystem", serialNumber: "SN-LIB-001", status: "Installed", quantity: 6, assignedProject: "PRJ-001", location: "Integration Bay", lastMaintenanceDate: "2025-06-15" },
   { id: "INV-005", name: "Ka-Band Transponder", type: "Module", serialNumber: "SN-KBT-001", status: "Testing", quantity: 3, assignedProject: "PRJ-005", location: "Test Lab C-1", lastMaintenanceDate: null },
   { id: "INV-006", name: "Gyroscope MEMS-G1", type: "Component", serialNumber: "SN-MEMS-G1-001", status: "Available", quantity: 25, assignedProject: null, location: "Warehouse A-3", lastMaintenanceDate: null },
-  { id: "INV-007", name: "Thruster Assembly TA-50", type: "System", serialNumber: "SN-TA50-001", status: "Under Maintenance", quantity: 2, assignedProject: "PRJ-002", location: "Maintenance Bay", lastMaintenanceDate: "2025-07-01" },
+  { id: "INV-007", name: "Thruster Assembly TA-50", type: "System", serialNumber: "SN-TA50-001", status: "Under maintenanceLogs", quantity: 2, assignedProject: "PRJ-002", location: "maintenanceLogs Bay", lastMaintenanceDate: "2025-07-01" },
   { id: "INV-008", name: "Flight Computer FC-X", type: "Module", serialNumber: "SN-FCX-001", status: "Installed", quantity: 4, assignedProject: "PRJ-002", location: "Integration Bay", lastMaintenanceDate: null },
   { id: "INV-009", name: "Crypto Module CM-SEC", type: "Module", serialNumber: "SN-CMSEC-001", status: "Installed", quantity: 3, assignedProject: "PRJ-006", location: "Secure Room D-1", lastMaintenanceDate: "2025-08-01" },
   { id: "INV-010", name: "SAR Antenna Feed", type: "Component", serialNumber: "SN-SAR-AF-001", status: "Failed", quantity: 1, assignedProject: "PRJ-006", location: "Test Lab C-2", lastMaintenanceDate: "2025-08-10" },
@@ -315,7 +315,7 @@ export const projectStatusData = [
   { name: "Building", value: 2, fill: "var(--color-chart-1)" },
   { name: "Testing", value: 1, fill: "var(--color-chart-2)" },
   { name: "Delivered", value: 1, fill: "var(--color-chart-3)" },
-  { name: "Maintenance", value: 1, fill: "var(--color-chart-5)" },
+  { name: "maintenanceLogs", value: 1, fill: "var(--color-chart-5)" },
 ];
 
 export const monthlyOrdersData = [

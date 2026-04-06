@@ -94,7 +94,7 @@ interface DataStoreContextType {
   updateStatus: (id: number, data: Partial<Models.Status>) => Promise<Models.Status>;
   deleteStatus: (id: number) => Promise<void>;
 
-  // Maintenance
+  // maintenanceLogs
   createMaintenanceLog: (data: Partial<Models.MaintenanceLog>) => Promise<Models.MaintenanceLog>;
   getEntityMaintenanceLogs: (entityId: number) => Promise<Models.MaintenanceLog[]>;
   getEntityStatusHistory: (entityId: number) => Promise<Models.EntityStatusHistory[]>;
@@ -123,6 +123,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const refreshData = async () => {
     try {
+      console.log("Refreshing data...");
+      api.customers.list(0, 100)        .then(res => console.log("Fetched customers:", res.data))
       setLoading(true);
       const [usersRes, customersRes, ordersRes, projectsRes, systemsRes, subsystemsRes, modulesRes, unitsRes, componentsRes, inventoryRes, statusesRes, maintenanceRes] =
         await Promise.all([
@@ -137,9 +139,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           api.components.list(0, 100),
           api.inventory.list(0, 100),
           api.statuses.list(0, 100),
-          api.maintenanceLogs.list(0, 100),
+          //api.maintenanceLogs.list(0, 100),
         ]);
-
+      console.log("Fetched customers:", customersRes.data);
       setUsers(usersRes.data);
       setCustomers(customersRes.data);
       setOrders(ordersRes.data);
@@ -151,7 +153,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setComponents(componentsRes.data);
       setInventory(inventoryRes.data);
       setStatuses(statusesRes.data);
-      setMaintenanceLogs(maintenanceRes.data);
+      //setMaintenanceLogs(maintenanceRes.data);
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
@@ -163,6 +165,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    console.log("Refreshing data inside useEffect...");
     refreshData();
   }, []);
 
@@ -215,8 +218,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   // Customers
   const getCustomer = async (id: number) => {
     try {
+      console.log("Fetching customer with ID:", id);
       const res = await api.customers.get(id);
+      console.log("Fetched customers:", res.data);
       return res.data;
+      
     } catch (err) {
       toast.error('Failed to fetch customer');
       throw err;
@@ -712,15 +718,15 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Maintenance
+  // maintenanceLogs
   const createMaintenanceLog = async (data: Partial<Models.MaintenanceLog>) => {
     try {
       const res = await api.maintenanceLogs.create(data);
       setMaintenanceLogs([...maintenanceLogs, res.data]);
-      toast.success('Maintenance log created successfully');
+      toast.success('maintenanceLogs log created successfully');
       return res.data;
     } catch (err) {
-      toast.error('Failed to create maintenance log');
+      toast.error('Failed to create maintenanceLogs log');
       throw err;
     }
   };
@@ -730,7 +736,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       const res = await api.entities.getMaintenanceLogs(entityId);
       return res.data;
     } catch (err) {
-      toast.error('Failed to fetch maintenance logs');
+      toast.error('Failed to fetch maintenanceLogs logs');
       throw err;
     }
   };

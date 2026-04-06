@@ -146,7 +146,7 @@ export interface EntityStatusHistory {
   changed_by_user?: User
 }
 
-// Maintenance Log
+// maintenanceLogs Log
 export interface MaintenanceLog {
   id: number
   entity_id: number

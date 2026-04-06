@@ -130,7 +130,7 @@ export const entities = {
   list: (skip = 0, limit = 100) => api.get<Models.Entity[]>("/entities/", { params: { skip, limit } }),
   get: (id: number) => api.get<Models.Entity>(`/entities/${id}/`),
   getStatusHistory: (id: number) => api.get<Models.EntityStatusHistory[]>(`/entities/${id}/status-history/`),
-  getMaintenanceLogs: (id: number) => api.get<Models.MaintenanceLog[]>(`/entities/${id}/maintenance-logs/`),
+  getMaintenanceLogs: (id: number) => api.get<Models.MaintenanceLog[]>(`/entities/${id}/maintenanceLogs-logs/`),
 };
 
 // Entity Status History
@@ -141,13 +141,13 @@ export const entityStatusHistory = {
   create: (data: Partial<Models.EntityStatusHistory>) => api.post<Models.EntityStatusHistory>("/entity-status-history/", data),
 };
 
-// Maintenance Logs
+// maintenanceLogs Logs
 export const maintenanceLogs = {
-  list: (skip = 0, limit = 100) => api.get<Models.MaintenanceLog[]>("/maintenance-logs/", { params: { skip, limit } }),
-  get: (id: number) => api.get<Models.MaintenanceLog>(`/maintenance-logs/${id}/`),
-  create: (data: Partial<Models.MaintenanceLog>) => api.post<Models.MaintenanceLog>("/maintenance-logs/", data),
-  update: (id: number, data: Partial<Models.MaintenanceLog>) => api.put<Models.MaintenanceLog>(`/maintenance-logs/${id}/`, data),
-  delete: (id: number) => api.delete(`/maintenance-logs/${id}/`),
+  list: (skip = 0, limit = 100) => api.get<Models.MaintenanceLog[]>("/maintenanceLogs-logs/", { params: { skip, limit } }),
+  get: (id: number) => api.get<Models.MaintenanceLog>(`/maintenanceLogs-logs/${id}/`),
+  create: (data: Partial<Models.MaintenanceLog>) => api.post<Models.MaintenanceLog>("/maintenanceLogs-logs/", data),
+  update: (id: number, data: Partial<Models.MaintenanceLog>) => api.put<Models.MaintenanceLog>(`/maintenanceLogs-logs/${id}/`, data),
+  delete: (id: number) => api.delete(`/maintenanceLogs-logs/${id}/`),
 };
 
 export default api;

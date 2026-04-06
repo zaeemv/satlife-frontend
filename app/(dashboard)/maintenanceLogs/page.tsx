@@ -13,11 +13,11 @@ import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MaintenancePage() {
-  const { maintenance, components, users, loading, createMaintenance } = useDataStore();
+  const { maintenanceLogs, components, users, loading, createMaintenanceLog } = useDataStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [selectedLog, setSelectedLog] = useState<typeof maintenance[0] | null>(null);
+  const [selectedLog, setSelectedLog] = useState<typeof maintenanceLogs[0] | null>(null);
   const [formData, setFormData] = useState({
     component_id: 0,
     technician_id: 0,
@@ -25,7 +25,7 @@ export default function MaintenancePage() {
     maintenance_type: 'preventive',
   });
 
-  const filtered = maintenance.filter((log) => {
+  const filtered = maintenanceLogs.filter((log) => {
     const component = components.find((c) => c.id === log.component_id);
     const matchesSearch =
       component?.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -40,7 +40,7 @@ export default function MaintenancePage() {
       return;
     }
     try {
-      await createMaintenance(formData);
+      await createMaintenanceLog(formData);
       setFormData({
         component_id: 0,
         technician_id: 0,
@@ -58,8 +58,8 @@ export default function MaintenancePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Maintenance</h1>
-        <p className="text-muted-foreground mt-2">Track component maintenance history</p>
+        <h1 className="text-3xl font-bold tracking-tight">maintenanceLogs</h1>
+        <p className="text-muted-foreground mt-2">Track component maintenanceLogs history</p>
       </div>
 
       <div className="flex gap-4 items-center">
@@ -87,13 +87,13 @@ export default function MaintenancePage() {
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Log Maintenance
+              Log maintenanceLogs
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Log Maintenance</DialogTitle>
-              <DialogDescription>Record a maintenance activity</DialogDescription>
+              <DialogTitle>Log maintenanceLogs</DialogTitle>
+              <DialogDescription>Record a maintenanceLogs activity</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
@@ -153,7 +153,7 @@ export default function MaintenancePage() {
                 <Input
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="Maintenance details"
+                  placeholder="maintenanceLogs details"
                   className="h-20"
                 />
               </div>
@@ -170,7 +170,7 @@ export default function MaintenancePage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Maintenance History</CardTitle>
+          <CardTitle>maintenanceLogs History</CardTitle>
           <CardDescription>Total records: {filtered.length}</CardDescription>
         </CardHeader>
         <CardContent>
@@ -189,7 +189,7 @@ export default function MaintenancePage() {
                 {filtered.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                      No maintenance records found
+                      No maintenanceLogs records found
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -226,7 +226,7 @@ export default function MaintenancePage() {
       <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Maintenance Details</DialogTitle>
+            <DialogTitle>maintenanceLogs Details</DialogTitle>
           </DialogHeader>
           {selectedLog && (
             <div className="space-y-4">

@@ -12,7 +12,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: 'SatLife - Satellite Lifecycle Management',
-  description: 'Professional satellite lifecycle management system for tracking projects, systems, maintenance and inventory.',
+  description: 'Professional satellite lifecycle management system for tracking projects, systems, maintenanceLogs and inventory.',
   generator: 'v0.app',
   icons: {
     icon: [
