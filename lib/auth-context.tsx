@@ -70,9 +70,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const userData = await userResponse.json();
-
-    setUser(userData);
-    localStorage.setItem('sat-user', JSON.stringify(userData));
+    const userDataWithRole = {
+      ...userData,
+      roles: userData.roles.map((r: any) => r.name), // 👈 FIX
+    };
+    
+    setUser(userDataWithRole);
+    localStorage.setItem('sat-user', JSON.stringify(userDataWithRole));
 
   }, []);
 

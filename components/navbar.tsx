@@ -51,15 +51,18 @@ export function Navbar() {
 
         <div className="flex items-center gap-3 border-l border-border pl-4">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground text-xs font-bold">
-            {user?.name?.split(" ").map(n => n[0]).join("") || "U"}
+            {user?.full_name?.split(" ").map(n => n[0]).join("") || "U"}
           </div>
+
           <div className="hidden md:block">
-            <p className="text-sm font-medium leading-none text-foreground">{user?.full_name || "User"}</p>
-            <Badge
-              variant="outline"
-              className={`mt-1 text-[10px] px-1.5 py-0}`}
-            >
-              {user?.roles[0] || "Viewer"}
+            <p className="text-sm font-medium leading-none text-foreground">
+              {user?.full_name || "User"}
+            </p>
+
+            <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0">
+              {user?.roles?.length
+                ? user.roles.join(", ")
+                : "Viewer"}
             </Badge>
           </div>
         </div>
