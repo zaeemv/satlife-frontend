@@ -54,12 +54,12 @@ export function Navbar() {
             {user?.name?.split(" ").map(n => n[0]).join("") || "U"}
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-medium leading-none text-foreground">{user?.name || "User"}</p>
+            <p className="text-sm font-medium leading-none text-foreground">{user?.full_name || "User"}</p>
             <Badge
               variant="outline"
-              className={`mt-1 text-[10px] px-1.5 py-0 ${roleBadgeColors[user?.role || "Viewer"]}`}
+              className={`mt-1 text-[10px] px-1.5 py-0}`}
             >
-              {user?.role || "Viewer"}
+              {user?.roles[0] || "Viewer"}
             </Badge>
           </div>
         </div>
