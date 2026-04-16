@@ -118,7 +118,10 @@ export const inventory = {
 
 // Statuses
 export const statuses = {
-  list: (skip = 0, limit = 100) => api.get<Models.Status[]>("/statuses/", { params: { skip, limit } }),
+  list: (status_type?: string) =>
+    api.get<Models.Status[]>("/statuses/", {
+      params: { status_type },
+    }),
   get: (id: number) => api.get<Models.Status>(`/statuses/${id}/`),
   create: (data: Partial<Models.Status>) => api.post<Models.Status>("/statuses/", data),
   update: (id: number, data: Partial<Models.Status>) => api.put<Models.Status>(`/statuses/${id}/`, data),

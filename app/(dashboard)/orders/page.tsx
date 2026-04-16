@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,15 +11,19 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import * as api from '@/lib/api';
+import * as Models from '@/lib/models';
 
 export default function OrdersPage() {
-  const { orders, customers, statuses, loading, createOrder, updateOrder, deleteOrder } = useDataStore();
+  const { orders, customers, loading, createOrder, updateOrder, deleteOrder } = useDataStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [formData, setFormData] = useState({ order_number: '', customer_id: 0, status_id: 0 });
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
 
   const filtered = orders.filter((o) => {
     const matchesSearch = o.order_number.toLowerCase().includes(search.toLowerCase());
@@ -75,6 +79,21 @@ export default function OrdersPage() {
     });
     setIsEditOpen(true);
   }
+
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      try {
+        const res = await api.statuses.list("Order"); // 👈 filter here
+        setStatuses(res.data);
+      } catch (err) {
+        console.error("Failed to fetch statuses", err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchStatuses();
+  }, []);
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 

@@ -138,7 +138,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           api.units.list(0, 100),
           api.components.list(0, 100),
           api.inventory.list(0, 100),
-          api.statuses.list(0, 100),
+          //api.statuses.list(0, 100),
           //api.maintenanceLogs.list(0, 100),
         ]);
       console.log("Fetched customers:", customersRes.data);
@@ -152,7 +152,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setUnits(unitsRes.data);
       setComponents(componentsRes.data);
       setInventory(inventoryRes.data);
-      setStatuses(statusesRes.data);
+      //setStatuses(statusesRes.data);
+      //console.log("Fetched statuses:", statusesRes.data);
       //setMaintenanceLogs(maintenanceRes.data);
       setError(null);
     } catch (err) {
