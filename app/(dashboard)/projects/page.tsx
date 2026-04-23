@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,10 +11,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
+import * as api from '@/lib/api';
+import * as Models from '@/lib/models';
 
 export default function ProjectsPage() {
-  const { projects, users, orders, statuses, loading, createProject, updateProject, deleteProject } = useDataStore();
+  const { projects, users, orders, loading, createProject, updateProject, deleteProject } = useDataStore();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -27,6 +30,8 @@ export default function ProjectsPage() {
     order_id: 0,
     status_id: 0,
   });
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
 
   const filtered = projects.filter((p) =>
     p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -34,7 +39,7 @@ export default function ProjectsPage() {
   );
 
   async function handleCreate() {
-    if (!formData.name.trim() || !formData.owner_id || !formData.status_id) {
+    if (!formData.name.trim() || !formData.owner_id  || !formData.order_id || !formData.start_date || !formData.end_date) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -57,7 +62,7 @@ export default function ProjectsPage() {
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.name.trim() || !formData.owner_id || !formData.status_id) {
+    if (!formData.name.trim() || !formData.owner_id || !formData.status_id || !formData.order_id || !formData.start_date || !formData.end_date) {
       toast.error('Please fill in all required fields');
       return;
     }
@@ -82,7 +87,7 @@ export default function ProjectsPage() {
   async function handleDelete(id: number) {
     if (!confirm('Are you sure? This will delete associated systems.')) return;
     try {
-      await deleteProject(id);
+      await deleteProject(id);  
     } catch {
       // Error handled by DataStore
     }
@@ -101,7 +106,20 @@ export default function ProjectsPage() {
     });
     setIsEditOpen(true);
   }
+  useEffect(() => {
+      const fetchStatuses = async () => {
+        try {
+          const res = await api.statuses.list("Project"); // 👈 filter here
+          setStatuses(res.data);
+        } catch (err) {
+          console.error("Failed to fetch statuses", err);
+        } finally {
+          setLoadingStatuses(false);
+        }
+      };
 
+      fetchStatuses();
+    }, []);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (

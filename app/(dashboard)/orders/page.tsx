@@ -62,7 +62,7 @@ export default function OrdersPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this order?')) return;
+    if (!confirm('Are you sure you want to delete this order? All related Projects will also get deleted.')) return;
     try {
       await deleteOrder(id);
     } catch {

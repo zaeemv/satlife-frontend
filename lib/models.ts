@@ -50,6 +50,7 @@ export interface Project {
   owner?: User
   order?: Order
   status?: Status
+  systems?: System[]
 }
 
 // System (top level in hierarchy)

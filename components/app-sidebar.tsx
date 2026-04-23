@@ -22,8 +22,8 @@ const navItems = [
   { label: "Customers", href: "/customers", icon: Users },
   { label: "Orders", href: "/orders", icon: ShoppingCart },
   { label: "Projects", href: "/projects", icon: Rocket },
-  { label: "Inventory", href: "/inventory", icon: Package },
   { label: "Systems Hierarchy", href: "/hierarchy", icon: Network },
+  { label: "Inventory", href: "/inventory", icon: Package },
   { label: "maintenanceLogs", href: "/maintenanceLogs", icon: Wrench },
 ];
 
