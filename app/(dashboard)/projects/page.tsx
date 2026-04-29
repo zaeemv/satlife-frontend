@@ -106,10 +106,11 @@ export default function ProjectsPage() {
     });
     setIsEditOpen(true);
   }
+  
   useEffect(() => {
       const fetchStatuses = async () => {
         try {
-          const res = await api.statuses.list("Project"); // 👈 filter here
+          const res = await api.statuses.list("project"); // 👈 filter here
           setStatuses(res.data);
         } catch (err) {
           console.error("Failed to fetch statuses", err);
@@ -265,6 +266,8 @@ export default function ProjectsPage() {
                   <TableHead>Owner</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
+                  <TableHead>% Progress</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -286,6 +289,12 @@ export default function ProjectsPage() {
                         <TableCell>{status?.name || 'N/A'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
                           {new Date(project.start_date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground">
+                          {new Date(project.end_date).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell className="text-sm text-muted-foreground ">
+                          10%
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">

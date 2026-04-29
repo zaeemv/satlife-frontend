@@ -324,7 +324,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const createProject = async (data: Partial<Models.Project>) => {
     try {
+     console.log("Created project:");
       const res = await api.projects.create(data);
+      console.log("Created project:", res.data);
       setProjects([...projects, res.data]);
       toast.success('Project created successfully');
       return res.data;
