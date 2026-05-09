@@ -1,8 +1,9 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Rocket, Package, Wrench, AlertTriangle } from 'lucide-react';
+import { Rocket, Package, Wrench, AlertTriangle, Zap, Pause, CheckCircle, Clock } from 'lucide-react';
 import {
   PieChart,
   Pie,
@@ -22,7 +23,8 @@ import {
 const PIE_COLORS = ['oklch(0.62 0.15 250)', 'oklch(0.55 0.14 250)', 'oklch(0.65 0.15 165)', 'oklch(0.70 0.18 45)', 'oklch(0.55 0.2 15)'];
 
 export default function DashboardPage() {
-  const { projects, orders, inventory, maintenanceLogs, loading } = useDataStore();
+  const router = useRouter();
+  const { projects, orders, inventory, maintenanceLogs, loading, statuses } = useDataStore();
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -33,6 +35,20 @@ export default function DashboardPage() {
   const totalOrders = orders.length;
   const inventoryItems = inventory.reduce((sum, item) => sum + item.quantity, 0);
   const maintenanceRecords = maintenanceLogs.length;
+
+  // Project status breakdown - count projects by status name
+  const projectStatuses = {
+    'Initiation': projects.filter(p => p.status_name === 'Initiation').length,
+    'Planning': projects.filter(p => p.status_name === 'Planning').length,
+    'Execution': projects.filter(p => p.status_name === 'Execution').length,
+    'Monitoring': projects.filter(p => p.status_name === 'Monitoring').length,
+    'Completed': projects.filter(p => p.status_name === 'Completed').length,
+    'On Hold': projects.filter(p => p.status_name === 'On Hold').length,
+  };
+
+  const handleKPIClick = (path: string) => {
+    router.push(path);
+  };
 
   // Project status distribution (dummy calculation for demo)
   const projectStatusData = [
@@ -61,50 +77,183 @@ export default function DashboardPage() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
-            <Rocket className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalProjects}</div>
-            <p className="text-xs text-muted-foreground">{inProgressProjects} in progress</p>
-          </CardContent>
-        </Card>
+        <button
+          onClick={() => handleKPIClick('/projects')}
+          className="cursor-pointer transition-transform hover:scale-105"
+        >
+          <Card className="h-full hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Projects</CardTitle>
+              <Rocket className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalProjects}</div>
+              <p className="text-xs text-muted-foreground">{inProgressProjects} in progress</p>
+            </CardContent>
+          </Card>
+        </button>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{totalOrders}</div>
-            <p className="text-xs text-muted-foreground">All orders</p>
-          </CardContent>
-        </Card>
+        <button
+          onClick={() => handleKPIClick('/orders')}
+          className="cursor-pointer transition-transform hover:scale-105"
+        >
+          <Card className="h-full hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{totalOrders}</div>
+              <p className="text-xs text-muted-foreground">All orders</p>
+            </CardContent>
+          </Card>
+        </button>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Inventory Items</CardTitle>
-            <Package className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{inventoryItems}</div>
-            <p className="text-xs text-muted-foreground">Total components</p>
-          </CardContent>
-        </Card>
+        <button
+          onClick={() => handleKPIClick('/inventory')}
+          className="cursor-pointer transition-transform hover:scale-105"
+        >
+          <Card className="h-full hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Inventory Items</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{inventoryItems}</div>
+              <p className="text-xs text-muted-foreground">Total components</p>
+            </CardContent>
+          </Card>
+        </button>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">maintenanceLogs Records</CardTitle>
-            <Wrench className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{maintenanceRecords}</div>
-            <p className="text-xs text-muted-foreground">All activities</p>
-          </CardContent>
-        </Card>
+        <button
+          onClick={() => handleKPIClick('/maintenanceLogs')}
+          className="cursor-pointer transition-transform hover:scale-105"
+        >
+          <Card className="h-full hover:shadow-lg">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Maintenance Logs</CardTitle>
+              <Wrench className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{maintenanceRecords}</div>
+              <p className="text-xs text-muted-foreground">All records</p>
+            </CardContent>
+          </Card>
+        </button>
       </div>
+
+      {/* Project Status Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Project Status Breakdown</CardTitle>
+          <CardDescription>Click on a status card to filter projects</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <button
+              onClick={() => handleKPIClick('/projects?status=Initiation')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Initiation</p>
+                      <p className="text-2xl font-bold">{projectStatuses['Initiation']}</p>
+                    </div>
+                    <Clock className="h-8 w-8 text-blue-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+
+            <button
+              onClick={() => handleKPIClick('/projects?status=Planning')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Planning</p>
+                      <p className="text-2xl font-bold">{projectStatuses['Planning']}</p>
+                    </div>
+                    <Rocket className="h-8 w-8 text-amber-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+
+            <button
+              onClick={() => handleKPIClick('/projects?status=Execution')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Execution</p>
+                      <p className="text-2xl font-bold">{projectStatuses['Execution']}</p>
+                    </div>
+                    <Zap className="h-8 w-8 text-yellow-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+
+            <button
+              onClick={() => handleKPIClick('/projects?status=Monitoring')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Monitoring</p>
+                      <p className="text-2xl font-bold">{projectStatuses['Monitoring']}</p>
+                    </div>
+                    <AlertTriangle className="h-8 w-8 text-orange-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+
+            <button
+              onClick={() => handleKPIClick('/projects?status=Completed')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Completed</p>
+                      <p className="text-2xl font-bold">{projectStatuses['Completed']}</p>
+                    </div>
+                    <CheckCircle className="h-8 w-8 text-green-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+
+            <button
+              onClick={() => handleKPIClick('/projects?status=On%20Hold')}
+              className="text-left cursor-pointer transition-transform hover:scale-105"
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">On Hold</p>
+                      <p className="text-2xl font-bold">{projectStatuses['On Hold']}</p>
+                    </div>
+                    <Pause className="h-8 w-8 text-red-500" />
+                  </div>
+                </CardContent>
+              </Card>
+            </button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -136,7 +285,7 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-75 flex items-center justify-center text-muted-foreground">
                 No project data available
               </div>
             )}
@@ -190,7 +339,7 @@ export default function DashboardPage() {
                 </PieChart>
               </ResponsiveContainer>
             ) : (
-              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+              <div className="h-75 flex items-center justify-center text-muted-foreground">
                 No inventory data available
               </div>
             )}

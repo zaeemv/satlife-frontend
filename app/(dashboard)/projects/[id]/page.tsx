@@ -1,43 +1,115 @@
-"use client";
+'use client';
 
-import { useState } from "react";
-import { useParams } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, Calendar, Layers, FileText } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { StatusBadge } from "@/components/status-badge";
-import { SystemTree } from "@/components/system-tree";
-import { MaintenanceTimeline } from "@/components/maintenanceLogs-timeline";
-import { projects, systems, maintenanceLogs, orders } from "@/lib/dummy-data";
+import { useParams } from 'next/navigation';
+import Link from 'next/link';
+import { useDataStore } from '@/lib/data-store';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ArrowLeft, FileText, Calendar, Layers } from 'lucide-react';
+import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle } from 'lucide-react';
+import { StatusBadge } from '@/components/status-badge';
+import { EntityCards } from '@/components/entity-cards';
+import { EntityForm } from '@/components/entity-form';
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import * as api from '@/lib/api';
+import * as Models from '@/lib/models';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
-  const project = projects.find((p) => p.id === projectId);
-  const [maintenanceModal, setMaintenanceModal] = useState<{
-    entityId: string;
-    entityName: string;
-  } | null>(null);
+  const { projects, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+
+  const project = projects.find((p) => String(p.id) === projectId);
+  const projectSystems = project ? systems.filter((s) => s.project_id === project.id) : [];
+  const order = project ? orders.find((o) => o.id === project.order_id) : null;
+
+
+
+  const systemFormFields = [
+    {
+      name: 'name',
+      label: 'System Name',
+      type: 'text' as const,
+      required: true,
+      placeholder: 'Enter system name',
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea' as const,
+      required: false,
+      placeholder: 'Enter system description',
+    },
+    // {
+    //   name: 'project_id',
+    //   label: 'Project',
+    //   type: 'select' as const,
+    //   required: true,
+    //   options: projects.map(p => ({ label: p.name, value: p.id })),
+    // },
+    {
+      name: 'status_id',
+      label: 'Status',
+      type: 'select' as const,
+      required: true,
+      options: statuses.map(s => ({ label: s.name, value: s.id })),
+    },
+
+  ];
+
+  async function handleAddSystem(formData: Record<string, any>) {
+    if (!project) {
+      toast.error('Project not found');
+      return;
+    }
+    if (!formData.name.trim() || !formData.description  || !formData.status_id) {
+          toast.error('Please fill in all required fields');
+          return;
+        }
+    setIsSubmitting(true);
+    try {
+      console.log("my project ID is ", project.id)
+      await createSystem({
+        name: formData.name,
+        description: formData.description || '',
+        project_id: formData.project_id ? Number(formData.project_id) : project.id,
+        status_id: Number(formData.status_id),
+      });
+      setIsAddOpen(false);
+      toast.success('System added successfully');
+    } catch (error) {
+      console.error('System creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add system';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteSystem(id: number) {
+    try {
+      await deleteSystem(id);
+      toast.success('System deleted successfully');
+    } catch {
+      toast.error('Failed to delete system');
+    }
+  }
 
   if (!project) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
-        <h2 className="text-xl font-semibold text-foreground">Project Not Found</h2>
+        <h2 className="text-xl font-semibold">Project Not Found</h2>
         <Link href="/projects" className="mt-2 text-sm text-primary underline">
           Back to Projects
         </Link>
@@ -45,21 +117,21 @@ export default function ProjectDetailPage() {
     );
   }
 
-  const projectSystems = systems.filter((s) =>
-    project.systemIds.includes(s.id)
-  );
-  const order = orders.find((o) => o.id === project.orderId);
-  const projectMaintenanceLogs = maintenanceLogs.filter(
-    (m) => m.projectId === project.id
-  );
-
-  const entityLogs = maintenanceModal
-    ? maintenanceLogs.filter(
-        (m) =>
-          m.entityId === maintenanceModal.entityId ||
-          m.entityName === maintenanceModal.entityName
-      )
-    : [];
+  useEffect(() => {
+        const fetchStatuses = async () => {
+          try {
+            const res = await api.statuses.list("systems"); // 👈 filter here
+            setStatuses(res.data);
+          } catch (err) {
+            console.error("Failed to fetch statuses", err);
+          } finally {
+            setLoadingStatuses(false);
+          }
+        };
+  
+        fetchStatuses();
+      }, []);
+    if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -84,13 +156,13 @@ export default function ProjectDetailPage() {
           </Button>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">{project.name}</h1>
-          <p className="text-sm font-mono text-muted-foreground">{project.id}</p>
+          <h1 className="text-3xl font-bold tracking-tight">{project.name}</h1>
+          <p className="text-sm text-muted-foreground mt-1">Manage systems and hierarchy</p>
         </div>
       </div>
 
-      {/* Project Info */}
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+      {/* Project Info Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card className="shadow-sm">
           <CardContent className="flex items-center gap-3 p-4">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
@@ -98,7 +170,7 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Order</p>
-              <p className="text-sm font-medium text-foreground">{order?.description || project.orderId}</p>
+              <p className="text-sm font-medium">{order?.order_number || project.order_id}</p>
             </div>
           </CardContent>
         </Card>
@@ -109,7 +181,7 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Delivery Date</p>
-              <p className="text-sm font-medium text-foreground">{project.deliveryDate}</p>
+              <p className="text-sm font-medium">{project.end_date}</p>
             </div>
           </CardContent>
         </Card>
@@ -120,61 +192,51 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Systems</p>
-              <p className="text-sm font-medium text-foreground">{projectSystems.length} assigned</p>
+              <p className="text-sm font-medium">{projectSystems.length}</p>
             </div>
           </CardContent>
         </Card>
         <Card className="shadow-sm">
           <CardContent className="flex items-center gap-3 p-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+              <FileText className="h-5 w-5 text-primary" />
+            </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={project.status} className="mt-1" />
+              <StatusBadge status={project.status?.name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* System Hierarchy Tree */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-card-foreground">
-            System Hierarchy
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <SystemTree
-            systems={projectSystems}
-            onShowMaintenance={(entityId, entityName) =>
-              setMaintenanceModal({ entityId, entityName })
-            }
-          />
-        </CardContent>
-      </Card>
+      {/* Systems Cards */}
+      <EntityCards
+        title="Systems"
+        description={`Manage systems for ${project.name}`}
+        entities={projectSystems}
+        onAdd={() => setIsAddOpen(true)}
+        onDelete={handleDeleteSystem}
+        detailPath={(id) => `/systems/${id}`}
+        addButtonLabel="Add System"
+        emptyMessage="No systems yet. Click 'Add System' to create one."
+      />
 
-      {/* Project maintenanceLogs Logs */}
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-card-foreground">
-            maintenanceLogs History ({projectMaintenanceLogs.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <MaintenanceTimeline logs={projectMaintenanceLogs} />
-        </CardContent>
-      </Card>
-
-      {/* Entity maintenanceLogs Modal */}
-      <Dialog
-        open={!!maintenanceModal}
-        onOpenChange={() => setMaintenanceModal(null)}
-      >
-        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+      {/* Add System Dialog */}
+      <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+        {/* <Button className="ml-auto" onClick={() => setIsAddOpen(true)}>
+          + New System
+        </Button> */}
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-foreground">
-              maintenanceLogs: {maintenanceModal?.entityName}
-            </DialogTitle>
+            <DialogTitle>Add New System</DialogTitle>
+            <DialogDescription>Create a new system for this project</DialogDescription>
           </DialogHeader>
-          <MaintenanceTimeline logs={entityLogs} />
+          <EntityForm
+            fields={systemFormFields}
+            onSubmit={handleAddSystem}
+            isLoading={isSubmitting}
+            onCancel={() => setIsAddOpen(false)}
+          />
         </DialogContent>
       </Dialog>
     </div>

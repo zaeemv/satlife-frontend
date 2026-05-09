@@ -83,7 +83,8 @@ export default function OrdersPage() {
   useEffect(() => {
     const fetchStatuses = async () => {
       try {
-        const res = await api.statuses.list("Order"); // 👈 filter here
+        const res = await api.statuses.list("orders"); //
+        console.log(res.data) 
         setStatuses(res.data);
       } catch (err) {
         console.error("Failed to fetch statuses", err);
@@ -188,7 +189,9 @@ export default function OrdersPage() {
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancel
                 </Button>
-                <Button onClick={handleCreate}>Create</Button>
+                <Button onClick={handleCreate}>
+                  Create
+                </Button>
               </div>
             </div>
           </DialogContent>
@@ -224,7 +227,7 @@ export default function OrdersPage() {
                     const customer = customers.find((c) => c.id === order.customer_id);
                     const status = statuses.find((s) => s.id === order.status_id);
                     return (
-                      <TableRow key={order.id}>
+                      <TableRow key={order.id} >
                         <TableCell className="font-medium">{order.order_number}</TableCell>
                         <TableCell>{customer?.name || 'N/A'}</TableCell>
                         <TableCell>{status?.name || 'N/A'}</TableCell>
@@ -236,14 +239,14 @@ export default function OrdersPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openEdit(order)}
+                              onClick={(e) => { e.stopPropagation(); openEdit(order)}}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleDelete(order.id)}
+                              onClick={(e) => { e.stopPropagation(); handleDelete(order.id)}}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>

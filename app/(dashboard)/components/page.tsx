@@ -1,19 +1,34 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Clock, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { StatusBadge } from '@/components/status-badge';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import Link from 'next/link';
+
+const COMPONENT_STATUSES = {
+  'Procured': { icon: Clock, color: 'text-blue-500' },
+  'In Inspection': { icon: AlertCircle, color: 'text-orange-500' },
+  'Approved': { icon: CheckCircle2, color: 'text-green-500' },
+  'Rejected': { icon: XCircle, color: 'text-red-500' },
+};
 
 export default function ComponentsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { components, units, loading, createComponent, updateComponent, deleteComponent } = useDataStore();
+  const statusFilterParam = searchParams.get('status');
+  const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -24,10 +39,17 @@ export default function ComponentsPage() {
     unit_id: 0,
   });
 
-  const filtered = components.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = components.filter((c) => {
+    const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
+      c.description?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || c.status?.name === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusCounts = Object.keys(COMPONENT_STATUSES).reduce((acc, status) => {
+    acc[status] = components.filter(c => c.status?.name === status).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.unit_id) {
@@ -60,11 +82,11 @@ export default function ComponentsPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure you want to delete this component?')) return;
     try {
       await deleteComponent(id);
+      toast.success('Component deleted successfully');
     } catch {
-      // Error handled
+      toast.error('Failed to delete component');
     }
   }
 
@@ -84,8 +106,68 @@ export default function ComponentsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Components</h1>
-        <p className="text-muted-foreground mt-2">Manage unit components</p>
+        <p className="text-muted-foreground mt-2">Manage unit components and parts</p>
       </div>
+
+      {/* Status Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status Overview</CardTitle>
+          <CardDescription>Click to filter by status</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                router.push('/components');
+              }}
+              className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === 'all' ? 'ring-2 ring-primary rounded-lg' : ''}`}
+            >
+              <Card className={`hover:shadow-lg ${statusFilter === 'all' ? 'bg-accent' : ''}`}>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">All Components</p>
+                  <p className="text-2xl font-bold">{components.length}</p>
+                </CardContent>
+              </Card>
+            </button>
+
+            {Object.entries(COMPONENT_STATUSES).map(([statusName, { icon: Icon, color }]) => (
+              <button
+                key={statusName}
+                onClick={() => {
+                  setStatusFilter(statusName);
+                  router.push(`/components?status=${encodeURIComponent(statusName)}`);
+                }}
+                className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === statusName ? 'ring-2 ring-primary rounded-lg' : ''}`}
+              >
+                <Card className={`hover:shadow-lg ${statusFilter === statusName ? 'bg-accent' : ''}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">{statusName}</p>
+                        <p className="text-2xl font-bold">{statusCounts[statusName] || 0}</p>
+                      </div>
+                      <Icon className={`h-8 w-8 ${color}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex gap-4 items-center">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            placeholder="Search components..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-10"
+          />
+        </div>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
@@ -167,7 +249,7 @@ export default function ComponentsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Unit</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -182,26 +264,38 @@ export default function ComponentsPage() {
                   filtered.map((component) => {
                     const unit = units.find((u) => u.id === component.unit_id);
                     return (
-                      <TableRow key={component.id}>
+                      <TableRow key={component.id} onClick={() => router.push(`/components/${component.id}`)}>
                         <TableCell className="font-medium">{component.name}</TableCell>
                         <TableCell>{unit?.name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{component.description}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={component.status?.name || 'Unknown'} />
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
+                            <Link href={`/components/${component.id}`}>
+                              <Button variant="outline" size="sm">
+                                View
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openEdit(component)}
+                              onClick={(e) => { e.stopPropagation(); openEdit(component)}}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(component.id)}
+                            {/* <ConfirmDialog
+                              title="Delete Component"
+                              description="Are you sure you want to delete this component?"
+                              onConfirm={() => handleDelete(component.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </ConfirmDialog> */}
                           </div>
                         </TableCell>
                       </TableRow>
@@ -262,6 +356,7 @@ export default function ComponentsPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+     </div>
+     </div>
   );
 }

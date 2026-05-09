@@ -3,6 +3,7 @@
 import * as React from 'react'
 
 import { cn } from '@/lib/utils'
+import Link from 'next/link';
 
 function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
@@ -61,7 +62,8 @@ function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
         className,
       )}
       {...props}
-    />
+      
+      />
   )
 }
 

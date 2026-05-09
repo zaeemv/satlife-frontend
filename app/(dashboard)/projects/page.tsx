@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,15 +10,22 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle, Presentation, Asterisk } from 'lucide-react';
 import { toast } from 'sonner';
+import { StatusBadge } from '@/components/status-badge';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import Link from 'next/link';
 
-export default function ProjectsPage() {
-  const { projects, users, orders, loading, createProject, updateProject, deleteProject } = useDataStore();
+export default function ProjectsPage(){
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { projects, users, orders, loading, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
+  
+  // Get status filter from URL params
+  const statusFilterParam = searchParams.get('status');
+  const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -33,10 +41,12 @@ export default function ProjectsPage() {
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
 
-  const filtered = projects.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = projects.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+      p.description.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || p.status_name === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.owner_id  || !formData.order_id || !formData.start_date || !formData.end_date) {
@@ -106,11 +116,21 @@ export default function ProjectsPage() {
     });
     setIsEditOpen(true);
   }
-  
+  const icons: Record<string, any> = {
+                'Initiation': Clock,
+                'Planning': Presentation,
+                'Execution': Zap,
+                'Monitoring': AlertTriangle,
+                'Completed': CheckCircle,
+                'On Hold': Pause,
+                'all': Asterisk,
+              };
+  const Icon = icons['all'] || Clock;
+
   useEffect(() => {
       const fetchStatuses = async () => {
         try {
-          const res = await api.statuses.list("project"); // 👈 filter here
+          const res = await api.statuses.list("projects"); // 👈 filter here
           setStatuses(res.data);
         } catch (err) {
           console.error("Failed to fetch statuses", err);
@@ -122,13 +142,82 @@ export default function ProjectsPage() {
       fetchStatuses();
     }, []);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
-
+  const statusNames = statuses.map((status) => status.name);
+  console.log(statusNames)
   return (
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Projects</h1>
-        <p className="text-muted-foreground mt-2">Manage satellite lifecycle projects</p>
+        <p className="text-muted-foreground mt-2 text-sm ">Manage satellite lifecycle projects</p>
       </div>
+
+      {/* Status Breakdown */}
+      <Card>
+        {/* <CardHeader> */}
+          {/* <CardTitle>Status Overview</CardTitle> */}
+          {/* <CardDescription>Click on a status to filter</CardDescription> */}
+        {/* </CardHeader> */}
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4 border-4">
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                router.push('/projects');
+              }}    
+              className="text-left cursor-pointer transition-transform "
+            >
+              <Card className="hover:shadow-lg">
+                <CardContent className="pt-6 flex flex-col ">
+                  <Icon className="flex h-3 text-muted-foreground border-2 w-full" />
+                  <div className ='flex flex-col items-start justify-between border-2'>                
+                        <p className="text-sm font-medium text-muted-foreground top-0 border-2">Total</p>
+                  <div className="flex justify-center border-2 w-full">
+                      <p className="text-4xl font-bold border-2 w-full">{projects.length}</p>
+                  </div>
+                  </div>
+
+                </CardContent>
+              </Card>
+            </button>
+            {/* {['Initiation', 'Planning', 'Execution', 'Monitoring', 'Completed', 'On Hold'] */}
+            {statusNames.map((s) => {
+              const count = projects.filter(p => p.status_name === s).length;
+              console.log(`Status: ${s}, Count: ${count}`, projects);
+              const icons: Record<string, any> = {
+                'Initiation': Clock,
+                'Planning': Presentation,
+                'Execution': Zap,
+                'Monitoring': AlertTriangle,
+                'Completed': CheckCircle,
+                'On Hold': Pause,
+              };
+              const Icon = icons[s] || Clock;
+              return (
+                <button
+                  key={s}
+                  onClick={() => {
+                    setStatusFilter(s);
+                    // router.push(`/projects?status=${encodeURIComponent(s)}`);
+                  }}
+                  className={`text-left cursor-pointer transition-transform ${statusFilter === s ? '' : ''}`}
+                >
+                  <Card className={`hover:shadow-lg ${statusFilter === s ? 'bg-accent' : 'h-full'}`}>
+                    <CardContent className="pt-6">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-medium text-muted-foreground">{s}</p>
+                          <p className="text-2xl font-bold">{count}</p>
+                        </div>
+                        <Icon className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
@@ -140,6 +229,7 @@ export default function ProjectsPage() {
             className="pl-10"
           />
         </div>
+        {/* Create New Project PoP up Window */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -201,7 +291,8 @@ export default function ProjectsPage() {
                       <SelectItem key={u.id} value={u.id.toString()}>
                         {u.full_name}
                       </SelectItem>
-                    ))}
+                    ))
+                  }
                   </SelectContent>
                 </Select>
               </div>
@@ -283,37 +374,33 @@ export default function ProjectsPage() {
                     const owner = users.find((u) => u.id === project.owner_id);
                     const status = statuses.find((s) => s.id === project.status_id);
                     return (
-                      <TableRow key={project.id}>
+                      <TableRow key={project.id}   onClick={() => router.push(`/projects/${project.id}`)}>
                         <TableCell className="font-medium">{project.name}</TableCell>
                         <TableCell>{owner?.full_name || 'N/A'}</TableCell>
-                        <TableCell>{status?.name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(project.start_date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground">
-                          {new Date(project.end_date).toLocaleDateString()}
-                        </TableCell>
-                        <TableCell className="text-sm text-muted-foreground ">
-                          10%
-                        </TableCell>
+                        <TableCell><StatusBadge status={status?.name || 'Unknown'} /></TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(project.start_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{new Date(project.end_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground ">10%</TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openEdit(project)}
+                              onClick={(e) => { e.stopPropagation()
+                                openEdit(project)}}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
                             <Button
                               size="sm"
                               variant="destructive"
-                              onClick={() => handleDelete(project.id)}
+                              onClick={(e) => { e.stopPropagation();handleDelete(project.id)}}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
                         </TableCell>
+                        {/* <Link href={`/projects/${project.id}`} className="absolute inset-0" /> */}
                       </TableRow>
                     );
                   })

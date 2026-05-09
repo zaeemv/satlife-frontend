@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,25 +10,57 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Clock, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { StatusBadge } from '@/components/status-badge';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import Link from 'next/link';
+import * as Models from '@/lib/models';
+import * as api from '@/lib/api';
+
+
+
+const SYSTEM_STATUSES = {
+  'Design': { icon: Clock, color: 'text-blue-500' },
+  'Development': { icon: Wrench, color: 'text-amber-500' },
+  'Testing': { icon: AlertCircle, color: 'text-orange-500' },
+  'Operational': { icon: CheckCircle2, color: 'text-green-500' },
+  'Retired': { icon: Trash2, color: 'text-red-500' },
+};
 
 export default function SystemsPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { systems, projects, loading, createSystem, updateSystem, deleteSystem } = useDataStore();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  const statusFilterParam = searchParams.get('status');
+  const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+
+  
+  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     project_id: 0,
   });
 
-  const filtered = systems.filter((s) =>
-    s.name.toLowerCase().includes(search.toLowerCase()) ||
-    s.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = systems.filter((s) => {
+    const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
+      s.description.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || s.status?.name === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusCounts = Object.keys(SYSTEM_STATUSES).reduce((acc, status) => {
+    acc[status] = systems.filter(s => s.status?.name === status).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.project_id) {
@@ -60,11 +93,11 @@ export default function SystemsPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure? This will delete associated subsystems.')) return;
     try {
       await deleteSystem(id);
+      toast.success('System deleted successfully');
     } catch {
-      // Error handled by DataStore
+      toast.error('Failed to delete system');
     }
   }
 
@@ -78,6 +111,21 @@ export default function SystemsPage() {
     setIsEditOpen(true);
   }
 
+  useEffect(() => {
+        const fetchStatuses = async () => {
+          try {
+            const res = await api.statuses.list("systems"); // 👈 filter here
+            setStatuses(res.data);
+          } catch (err) {
+            console.error("Failed to fetch statuses", err);
+          } finally {
+            setLoadingStatuses(false);
+          }
+        };
+  
+        fetchStatuses();
+      }, []);
+
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
@@ -86,6 +134,55 @@ export default function SystemsPage() {
         <h1 className="text-3xl font-bold tracking-tight">Systems</h1>
         <p className="text-muted-foreground mt-2">Manage satellite systems hierarchy</p>
       </div>
+
+      {/* Status Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status Overview</CardTitle>
+          <CardDescription>Click to filter by status</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                router.push('/systems');
+              }}
+              className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === 'all' ? 'ring-2 ring-primary rounded-lg' : ''}`}
+            >
+              <Card className={`hover:shadow-lg ${statusFilter === 'all' ? 'bg-accent' : ''}`}>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">All Systems</p>
+                  <p className="text-2xl font-bold">{systems.length}</p>
+                </CardContent>
+              </Card>
+            </button>
+
+            {Object.entries(SYSTEM_STATUSES).map(([statusName, { icon: Icon, color }]) => (
+              <button
+                key={statusName}
+                onClick={() => {
+                  setStatusFilter(statusName);
+                  router.push(`/systems?status=${encodeURIComponent(statusName)}`);
+                }}
+                className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === statusName ? 'ring-2 ring-primary rounded-lg' : ''}`}
+              >
+                <Card className={`hover:shadow-lg ${statusFilter === statusName ? 'bg-accent' : ''}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">{statusName}</p>
+                        <p className="text-2xl font-bold">{statusCounts[statusName] || 0}</p>
+                      </div>
+                      <Icon className={`h-8 w-8 ${color}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
@@ -167,7 +264,7 @@ export default function SystemsPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Project</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -182,26 +279,38 @@ export default function SystemsPage() {
                   filtered.map((system) => {
                     const project = projects.find((p) => p.id === system.project_id);
                     return (
-                      <TableRow key={system.id}>
+                      <TableRow key={system.id} onClick={() => router.push(`/systems/${system.id}`)}>
                         <TableCell className="font-medium">{system.name}</TableCell>
                         <TableCell>{project?.name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{system.description}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={system.status?.name || 'Unknown'} />
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
+                            <Link href={`systems/${system.id}`}>
+                              <Button variant="outline" size="sm">
+                                View
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openEdit(system)}
+                              onClick={(e) => { e.stopPropagation(); openEdit(system)}}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(system.id)}
+                            {/* <ConfirmDialog
+                              title="Delete System"
+                              description="Are you sure you want to delete this system?"
+                              onConfirm={() => handleDelete(system.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </ConfirmDialog> */}
                           </div>
                         </TableCell>
                       </TableRow>

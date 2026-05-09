@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,25 +10,47 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Clock, Wrench, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { StatusBadge } from '@/components/status-badge';
+import { ConfirmDialog } from '@/components/confirm-dialog';
+import Link from 'next/link';
+
+const MODULE_STATUSES = {
+  'Design': { icon: Clock, color: 'text-blue-500' },
+  'Development': { icon: Wrench, color: 'text-amber-500' },
+  'Testing': { icon: AlertCircle, color: 'text-orange-500' },
+  'Integrated': { icon: CheckCircle2, color: 'text-green-500' },
+};
 
 export default function ModulesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { modules, subsystems, loading, createModule, updateModule, deleteModule } = useDataStore();
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  
+  const statusFilterParam = searchParams.get('status');
+  const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [formData, setFormData] = useState({
     name: '',
     description: '',
     subsystem_id: 0,
   });
 
-  const filtered = modules.filter((m) =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.description.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = modules.filter((m) => {
+    const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
+      m.description?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || m.status?.name === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
+
+  const statusCounts = Object.keys(MODULE_STATUSES).reduce((acc, status) => {
+    acc[status] = modules.filter(m => m.status?.name === status).length;
+    return acc;
+  }, {} as Record<string, number>);
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.subsystem_id) {
@@ -60,11 +83,11 @@ export default function ModulesPage() {
   }
 
   async function handleDelete(id: number) {
-    if (!confirm('Are you sure? This will delete associated units.')) return;
     try {
       await deleteModule(id);
+      toast.success('Module deleted successfully');
     } catch {
-      // Error handled
+      toast.error('Failed to delete module');
     }
   }
 
@@ -86,6 +109,55 @@ export default function ModulesPage() {
         <h1 className="text-3xl font-bold tracking-tight">Modules</h1>
         <p className="text-muted-foreground mt-2">Manage subsystem modules</p>
       </div>
+
+      {/* Status Breakdown */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Status Overview</CardTitle>
+          <CardDescription>Click to filter by status</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            <button
+              onClick={() => {
+                setStatusFilter('all');
+                router.push('/modules');
+              }}
+              className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === 'all' ? 'ring-2 ring-primary rounded-lg' : ''}`}
+            >
+              <Card className={`hover:shadow-lg ${statusFilter === 'all' ? 'bg-accent' : ''}`}>
+                <CardContent className="pt-6">
+                  <p className="text-sm font-medium text-muted-foreground">All Modules</p>
+                  <p className="text-2xl font-bold">{modules.length}</p>
+                </CardContent>
+              </Card>
+            </button>
+
+            {Object.entries(MODULE_STATUSES).map(([statusName, { icon: Icon, color }]) => (
+              <button
+                key={statusName}
+                onClick={() => {
+                  setStatusFilter(statusName);
+                  router.push(`/modules?status=${encodeURIComponent(statusName)}`);
+                }}
+                className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === statusName ? 'ring-2 ring-primary rounded-lg' : ''}`}
+              >
+                <Card className={`hover:shadow-lg ${statusFilter === statusName ? 'bg-accent' : ''}`}>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">{statusName}</p>
+                        <p className="text-2xl font-bold">{statusCounts[statusName] || 0}</p>
+                      </div>
+                      <Icon className={`h-8 w-8 ${color}`} />
+                    </div>
+                  </CardContent>
+                </Card>
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
@@ -167,7 +239,7 @@ export default function ModulesPage() {
                 <TableRow>
                   <TableHead>Name</TableHead>
                   <TableHead>Subsystem</TableHead>
-                  <TableHead>Description</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -182,26 +254,38 @@ export default function ModulesPage() {
                   filtered.map((module) => {
                     const subsystem = subsystems.find((s) => s.id === module.subsystem_id);
                     return (
-                      <TableRow key={module.id}>
+                      <TableRow key={module.id} onClick={() => router.push(`/modules/${module.id}`)}>
                         <TableCell className="font-medium">{module.name}</TableCell>
                         <TableCell>{subsystem?.name || 'N/A'}</TableCell>
-                        <TableCell className="text-sm text-muted-foreground">{module.description}</TableCell>
+                        <TableCell>
+                          <StatusBadge status={module.status?.name || 'Unknown'} />
+                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">
+                            <Link href={`/modules/${module.id}`}>
+                              <Button variant="outline" size="sm">
+                                View
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => openEdit(module)}
+                              onClick={(e) => { e.stopPropagation(); openEdit(module)}}
                             >
                               <Edit className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(module.id)}
+                            {/* <ConfirmDialog
+                              title="Delete Module"
+                              description="Are you sure you want to delete this module?"
+                              onConfirm={() => handleDelete(module.id)}
                             >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </ConfirmDialog> */}
                           </div>
                         </TableCell>
                       </TableRow>
