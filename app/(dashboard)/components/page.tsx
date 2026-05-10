@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
+import * as api from '@/lib/api';
+import type { Hierarchy } from '@/lib/models';
 
 const COMPONENT_STATUSES = {
   'Procured': { icon: Clock, color: 'text-blue-500' },
@@ -33,6 +35,8 @@ export default function ComponentsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Hierarchy[]>([]);
+  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Hierarchy[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -99,6 +103,23 @@ export default function ComponentsPage() {
     });
     setIsEditOpen(true);
   }
+
+  useEffect(() => {
+    const fetchHierarchyNames = async () => {
+      try {
+        const [unitRes, componentRes] = await Promise.all([
+          api.hierarchies.list('unit'),
+          api.hierarchies.list('component'),
+        ]);
+        setUnitHierarchyNames(unitRes.data);
+        setComponentHierarchyNames(componentRes.data);
+      } catch (err) {
+        console.error('Failed to load component hierarchy names', err);
+      }
+    };
+
+    fetchHierarchyNames();
+  }, []);
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -168,17 +189,6 @@ export default function ComponentsPage() {
             className="pl-10"
           />
         </div>
-
-      <div className="flex gap-4 items-center">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search components..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
-        </div>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -193,12 +203,22 @@ export default function ComponentsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Component Name *</Label>
-                <Input
+                <Label>Choose component from hierarchy</Label>
+                <Select
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Valve Assembly"
-                />
+                  onValueChange={(value) => setFormData({ ...formData, name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select component name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {componentHierarchyNames.map((hierarchy) => (
+                      <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                        {hierarchy.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Description</Label>
@@ -316,11 +336,22 @@ export default function ComponentsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Name</Label>
-              <Input
+              <Label>Choose component from hierarchy</Label>
+              <Select
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+                onValueChange={(value) => setFormData({ ...formData, name: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select component name" />
+                </SelectTrigger>
+                <SelectContent>
+                  {componentHierarchyNames.map((hierarchy) => (
+                    <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                      {hierarchy.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Description</Label>
@@ -356,7 +387,6 @@ export default function ComponentsPage() {
           </div>
         </DialogContent>
       </Dialog>
-     </div>
-     </div>
+    </div>
   );
 }

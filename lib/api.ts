@@ -107,6 +107,18 @@ export const components = {
   delete: (id: number) => api.delete(`/components/${id}/`),
 };
 
+// Hierarchies
+export const hierarchies = {
+  list: (hierarchy_type?: string, parent_id?: number) =>
+    api.get<Models.Hierarchy[]>("/hierarchies/", {
+      params: { hierarchy_type, parent_id },
+    }),
+  get: (id: number) => api.get<Models.Hierarchy>(`/hierarchies/${id}/`),
+  create: (data: Partial<Models.Hierarchy>) => api.post<Models.Hierarchy>("/hierarchies/", data),
+  update: (id: number, data: Partial<Models.Hierarchy>) => api.put<Models.Hierarchy>(`/hierarchies/${id}/`, data),
+  delete: (id: number) => api.delete(`/hierarchies/${id}/`),
+};
+
 // Inventory
 export const inventory = {
   list: (skip = 0, limit = 100) => api.get<Models.Inventory[]>("/inventory/", { params: { skip, limit } }),

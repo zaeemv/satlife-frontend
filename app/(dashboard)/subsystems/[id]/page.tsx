@@ -28,13 +28,14 @@ export default function SubsystemDetailPage() {
   const subsystemModules = subsystem ? modules.filter((m) => m.subsystem_id === subsystem.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const moduleFormFields = [
     {
       name: 'name',
       label: 'Module Name',
-      type: 'text' as const,
+      type: 'select' as const,
       required: true,
-      placeholder: 'Enter module name',
+      options: moduleHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
     },
     {
       name: 'description',
@@ -96,18 +97,22 @@ export default function SubsystemDetailPage() {
     );
   }
  useEffect(() => {
-      const fetchStatuses = async () => {
+      const fetchData = async () => {
         try {
-          const res = await api.statuses.list("modules"); // 👈 filter here
-          setStatuses(res.data);
+          const [statusRes, hierarchyRes] = await Promise.all([
+            api.statuses.list("modules"),
+            api.hierarchies.list("module"),
+          ]);
+          setStatuses(statusRes.data);
+          setModuleHierarchyNames(hierarchyRes.data);
         } catch (err) {
-          console.error("Failed to fetch statuses", err);
+          console.error("Failed to fetch statuses or hierarchy names", err);
         } finally {
           setLoadingStatuses(false);
         }
       };
 
-      fetchStatuses();
+      fetchData();
     }, []);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 

@@ -114,6 +114,16 @@ export interface Component {
   status?: Status
 }
 
+// Hierarchy entry used by the hierarchy management API
+export interface Hierarchy {
+  id: number
+  name: string
+  hierarchy_type: string
+  parent_id?: number | null
+  created_at: string
+  updated_at?: string
+}
+
 // Inventory
 export interface Inventory {
   id: number

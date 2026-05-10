@@ -13,7 +13,7 @@ interface FormField {
   type: 'text' | 'textarea' | 'select' | 'number';
   required: boolean;
   placeholder?: string;
-  options?: Array<{ label: string; value: number }>;
+  options?: Array<{ label: string; value: number | string }>;
 }
 
 interface EntityFormProps {
@@ -84,7 +84,7 @@ export function EntityForm({ onSubmit, fields, isLoading = false, onCancel }: En
             <Select 
               value={formData[field.name]?.toString() || ''} 
               onValueChange={(value) => {
-                setFormData({ ...formData, [field.name]: Number(value) });
+                setFormData({ ...formData, [field.name]: value });
               }}
             >
               <SelectTrigger className={errors[field.name] ? 'border-red-500' : ''}>
@@ -92,7 +92,7 @@ export function EntityForm({ onSubmit, fields, isLoading = false, onCancel }: En
               </SelectTrigger>
               <SelectContent>
                 {field.options && field.options.map(opt => (
-                  <SelectItem key={opt.value} value={String(opt.value)}>
+                  <SelectItem key={String(opt.value)} value={String(opt.value)}>
                     {opt.label}
                   </SelectItem>
                 ))}

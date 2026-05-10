@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,8 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
+import * as api from '@/lib/api';
+import type { Hierarchy } from '@/lib/models';
 
 const UNIT_STATUSES = {
   'Manufacturing': { icon: Clock, color: 'text-blue-500' },
@@ -33,6 +35,8 @@ export default function UnitsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Hierarchy[]>([]);
+  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Hierarchy[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -99,6 +103,23 @@ export default function UnitsPage() {
     });
     setIsEditOpen(true);
   }
+
+  useEffect(() => {
+    const fetchHierarchyNames = async () => {
+      try {
+        const [modulesRes, unitsRes] = await Promise.all([
+          api.hierarchies.list('module'),
+          api.hierarchies.list('unit'),
+        ]);
+        setModuleHierarchyNames(modulesRes.data);
+        setUnitHierarchyNames(unitsRes.data);
+      } catch (err) {
+        console.error('Failed to load unit hierarchy names', err);
+      }
+    };
+
+    fetchHierarchyNames();
+  }, []);
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -182,12 +203,22 @@ export default function UnitsPage() {
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Unit Name *</Label>
-                <Input
+                <Label>Choose unit from hierarchy</Label>
+                <Select
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Fuel Tank Assembly"
-                />
+                  onValueChange={(value) => setFormData({ ...formData, name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select unit name" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {unitHierarchyNames.map((hierarchy) => (
+                      <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                        {hierarchy.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Description</Label>
@@ -305,11 +336,22 @@ export default function UnitsPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Name</Label>
-              <Input
+              <Label>Choose unit from hierarchy</Label>
+              <Select
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
+                onValueChange={(value) => setFormData({ ...formData, name: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select unit name" />
+                </SelectTrigger>
+                <SelectContent>
+                  {unitHierarchyNames.map((hierarchy) => (
+                    <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                      {hierarchy.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Description</Label>

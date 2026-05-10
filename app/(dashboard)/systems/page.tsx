@@ -15,8 +15,9 @@ import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
-import * as Models from '@/lib/models';
 import * as api from '@/lib/api';
+import type { Hierarchy } from '@/lib/models';
+import * as Models from '@/lib/models';
 
 
 
@@ -41,9 +42,8 @@ export default function SystemsPage() {
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Hierarchy[]>([]);
 
-  
-  
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -114,10 +114,14 @@ export default function SystemsPage() {
   useEffect(() => {
         const fetchStatuses = async () => {
           try {
-            const res = await api.statuses.list("systems"); // 👈 filter here
-            setStatuses(res.data);
+            const [statusRes, hierarchyRes] = await Promise.all([
+              api.statuses.list("systems"),
+              api.hierarchies.list("system"),
+            ]);
+            setStatuses(statusRes.data);
+            setSystemHierarchyNames(hierarchyRes.data);
           } catch (err) {
-            console.error("Failed to fetch statuses", err);
+            console.error("Failed to fetch statuses or hierarchy names", err);
           } finally {
             setLoadingStatuses(false);
           }
@@ -209,11 +213,21 @@ export default function SystemsPage() {
             <div className="space-y-4">
               <div>
                 <Label>System Name *</Label>
-                <Input
+                <Select
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Propulsion System"
-                />
+                  onValueChange={(value) => setFormData({ ...formData, name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select system from hierarchy" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {systemHierarchyNames.map((hierarchy) => (
+                      <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                        {hierarchy.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label>Description</Label>
@@ -332,11 +346,21 @@ export default function SystemsPage() {
           <div className="space-y-4">
             <div>
               <Label>System Name</Label>
-              <Input
+              <Select
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="System name"
-              />
+                onValueChange={(value) => setFormData({ ...formData, name: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select system from hierarchy" />
+                </SelectTrigger>
+                <SelectContent>
+                  {systemHierarchyNames.map((hierarchy) => (
+                    <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                      {hierarchy.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label>Description</Label>

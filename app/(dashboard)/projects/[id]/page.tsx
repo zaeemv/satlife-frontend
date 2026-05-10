@@ -29,6 +29,7 @@ export default function ProjectDetailPage() {
   
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const project = projects.find((p) => String(p.id) === projectId);
   const projectSystems = project ? systems.filter((s) => s.project_id === project.id) : [];
@@ -40,9 +41,9 @@ export default function ProjectDetailPage() {
     {
       name: 'name',
       label: 'System Name',
-      type: 'text' as const,
+      type: 'select' as const,
       required: true,
-      placeholder: 'Enter system name',
+      options: systemHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
     },
     {
       name: 'description',
@@ -118,18 +119,22 @@ export default function ProjectDetailPage() {
   }
 
   useEffect(() => {
-        const fetchStatuses = async () => {
+        const fetchData = async () => {
           try {
-            const res = await api.statuses.list("systems"); // 👈 filter here
-            setStatuses(res.data);
+            const [statusRes, hierarchyRes] = await Promise.all([
+              api.statuses.list("systems"),
+              api.hierarchies.list("system"),
+            ]);
+            setStatuses(statusRes.data);
+            setSystemHierarchyNames(hierarchyRes.data);
           } catch (err) {
-            console.error("Failed to fetch statuses", err);
+            console.error("Failed to fetch statuses or hierarchy names", err);
           } finally {
             setLoadingStatuses(false);
           }
         };
   
-        fetchStatuses();
+        fetchData();
       }, []);
     if (loading) return <div className="p-8 text-center">Loading...</div>;
 

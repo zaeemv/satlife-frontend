@@ -29,14 +29,15 @@ export default function UnitDetailPage() {
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
   
   const componentFormFields = [
     {
       name: 'name',
       label: 'Component Name',
-      type: 'text' as const,
+      type: 'select' as const,
       required: true,
-      placeholder: 'Enter component name',
+      options: componentHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
     },
     {
       name: 'description',
@@ -96,18 +97,22 @@ export default function UnitDetailPage() {
   }
 
    useEffect(() => {
-        const fetchStatuses = async () => {
+        const fetchData = async () => {
           try {
-            const res = await api.statuses.list("modules"); // 👈 filter here
-            setStatuses(res.data);
+            const [statusRes, hierarchyRes] = await Promise.all([
+              api.statuses.list("components"),
+              api.hierarchies.list("component"),
+            ]);
+            setStatuses(statusRes.data);
+            setComponentHierarchyNames(hierarchyRes.data);
           } catch (err) {
-            console.error("Failed to fetch statuses", err);
+            console.error("Failed to fetch statuses or hierarchy names", err);
           } finally {
             setLoadingStatuses(false);
           }
         };
   
-        fetchStatuses();
+        fetchData();
       }, []);
     if (loading) return <div className="p-8 text-center">Loading...</div>;
   
