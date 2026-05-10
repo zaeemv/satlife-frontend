@@ -15,6 +15,7 @@ import {
   Satellite,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 const navItems = [
@@ -44,6 +45,11 @@ export function AppSidebar() {
         <div>
           <h1 className="text-base font-semibold tracking-tight text-sidebar-foreground">SatLife</h1>
           <p className="text-xs text-sidebar-foreground/60">Lifecycle Manager</p>
+          {user && (
+            <Badge variant="outline" className="mt-1 text-[10px] px-1.5 py-0">
+              {user?.roles?.length ? user.roles.join(", ") : "Viewer"}
+            </Badge>
+          )}
         </div>
       </div>
 
@@ -69,7 +75,7 @@ export function AppSidebar() {
           })}
         </div>
 
-        {user?.role === "Admin" && (
+        {user?.roles?.includes("Admin") && (
           <div className="mt-6">
             <p className="mb-2 px-3 text-xs font-semibold uppercase tracking-wider text-sidebar-foreground/40">
               Admin
