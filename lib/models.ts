@@ -17,6 +17,13 @@ export interface Customer {
   created_at: string
 }
 
+// Role
+export interface Role {
+  id: number
+  name: string
+  description?: string
+}
+
 // Status
 export interface Status {
   id: number

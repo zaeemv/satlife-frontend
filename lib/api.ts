@@ -19,6 +19,12 @@ api.interceptors.request.use((config) => {
 export const auth = {
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>("/auth/login", { username, password }),
+  listRoles: () => api.get("/auth/roles"),
+  getRole: (id: number) => api.get(`/auth/roles/${id}`),
+  assignRole: (userId: number, roleId: number) =>
+    api.post("/auth/assign-role", { user_id: userId, role_id: roleId }),
+  removeRole: (userId: number, roleId: number) =>
+    api.delete("/auth/remove-role", { data: { user_id: userId, role_id: roleId } }),
 };
 
 // Users

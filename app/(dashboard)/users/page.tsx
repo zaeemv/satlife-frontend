@@ -1,16 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/auth-context';
+import * as api from '@/lib/api';
+import type * as Models from '@/lib/models';
 
 export default function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -19,13 +22,40 @@ export default function UsersPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [roles, setRoles] = useState<Models.Role[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
   const [formData, setFormData] = useState({
     username: '',
     password: '',
     full_name: '',
     email: '',
-    role: 'user',
+    role_id: '',
   });
+  const [editFormData, setEditFormData] = useState({
+    username: '',
+    password: '',
+    full_name: '',
+    email: '',
+    role_id: '',
+  });
+
+  // Fetch roles on component mount
+  useEffect(() => {
+    const fetchRoles = async () => {
+      try {
+        setLoadingRoles(true);
+        const response = await api.auth.listRoles();
+        console.log('Fetched roles:', response.data);
+        setRoles(response.data);
+      } catch (err) {
+        console.error('Failed to load roles:', err);
+        toast.error('Failed to load roles');
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+    fetchRoles();
+  }, []);
 
   const filtered = users.filter(
     (u) =>
@@ -34,8 +64,17 @@ export default function UsersPage() {
       u.username.toLowerCase().includes(search.toLowerCase())
   );
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Users data:', users);
+    console.log('Roles data:', roles);
+    if (users.length > 0) {
+      console.log('First user roles:', users[0].roles);
+    }
+  }, [users, roles]);
+
   // Admin-only access
-  if (currentUser?.role !== 'admin') {
+  if (currentUser?.roles?.includes('Admin') === false && currentUser?.roles?.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-center">
         <ShieldAlert className="h-12 w-12 text-muted-foreground mb-4" />
@@ -46,32 +85,70 @@ export default function UsersPage() {
   }
 
   async function handleCreate() {
-    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
+    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim() || !formData.role_id) {
       toast.error('Please fill in all required fields');
       return;
     }
     try {
-      await createUser(formData);
-      setFormData({ username: '', password: '', full_name: '', email: '', role: 'user' });
+      const roleId = parseInt(formData.role_id);
+      const userData: any = {
+        username: formData.username,
+        password: formData.password,
+        full_name: formData.full_name,
+        email: formData.email,
+        is_active: true,
+      };
+      
+      const newUser = await createUser(userData);
+      console.log('User created:', newUser);
+      
+      // Assign role to the newly created user
+      if (roleId) {
+        await api.auth.assignRole(newUser.id, roleId);
+        console.log('Role assigned to user:', newUser.id, 'roleId:', roleId);
+      }
+      
+      setFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setIsCreateOpen(false);
-    } catch {
-      // Error handled by DataStore
+      toast.success('User created successfully');
+    } catch (err) {
+      console.error('Failed to create user:', err);
+      toast.error('Failed to create user');
     }
   }
 
   async function handleUpdate() {
     if (!editingId) return;
-    if (!formData.full_name.trim()) {
+    if (!editFormData.full_name.trim()) {
       toast.error('Name is required');
       return;
     }
     try {
-      await updateUser(editingId, formData);
-      setFormData({ username: '', password: '', full_name: '', email: '', role: 'user' });
+      const userData: any = {
+        full_name: editFormData.full_name,
+        email: editFormData.email,
+      };
+      
+      if (editFormData.password) {
+        userData.password = editFormData.password;
+      }
+      
+      await updateUser(editingId, userData);
+      console.log('User updated:', editingId);
+      
+      if (editFormData.role_id) {
+        const roleId = parseInt(editFormData.role_id);
+        await api.auth.assignRole(editingId, roleId);
+        console.log('Role assigned to user:', editingId, 'roleId:', roleId);
+      }
+      
+      setEditFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setEditingId(null);
       setIsEditOpen(false);
-    } catch {
-      // Error handled by DataStore
+      toast.success('User updated successfully');
+    } catch (err) {
+      console.error('Failed to update user:', err);
+      toast.error('Failed to update user');
     }
   }
 
@@ -79,19 +156,29 @@ export default function UsersPage() {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
       await deleteUser(id);
-    } catch {
-      // Error handled by DataStore
+      toast.success('User deleted successfully');
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast.error('Failed to delete user');
     }
   }
 
   function openEdit(user: typeof users[0]) {
+    // Map role names to role IDs
+    let roleId = '';
+    if (user.roles && user.roles.length > 0) {
+      const firstRoleName = user.roles[0];
+      const foundRole = roles.find((r) => r.name === firstRoleName);
+      roleId = foundRole ? foundRole.id.toString() : '';
+    }
+    
     setEditingId(user.id);
-    setFormData({
+    setEditFormData({
       username: user.username,
       password: '',
       full_name: user.full_name,
       email: user.email,
-      role: user.role,
+      role_id: roleId,
     });
     setIsEditOpen(true);
   }
@@ -137,15 +224,6 @@ export default function UsersPage() {
                 />
               </div>
               <div>
-                <Label>Password *</Label>
-                <Input
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  placeholder="Password"
-                />
-              </div>
-              <div>
                 <Label>Full Name *</Label>
                 <Input
                   value={formData.full_name}
@@ -161,6 +239,34 @@ export default function UsersPage() {
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                   placeholder="john@example.com"
                 />
+              </div>
+              <div>
+                <Label>Password *</Label>
+                <Input
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  placeholder="Set initial password"
+                />
+              </div>
+              <div>
+                <Label>Role *</Label>
+                {loadingRoles ? (
+                  <p className="text-sm text-muted-foreground">Loading roles...</p>
+                ) : (
+                  <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select a role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {roles.map((role) => (
+                        <SelectItem key={role.id} value={role.id.toString()}>
+                          {role.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
               <div className="flex gap-2 justify-end pt-4">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
@@ -186,7 +292,7 @@ export default function UsersPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Username</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Role</TableHead>
+                  <TableHead>Roles</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -203,7 +309,7 @@ export default function UsersPage() {
                       <TableCell className="font-medium">{user.full_name}</TableCell>
                       <TableCell className="font-mono text-sm">{user.username}</TableCell>
                       <TableCell>{user.email}</TableCell>
-                      <TableCell className="capitalize">{user.role}</TableCell>
+                      <TableCell className="capitalize">{user.roles?.join(', ') || 'No role'}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex gap-2 justify-end">
                           <Button
@@ -235,18 +341,18 @@ export default function UsersPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit User</DialogTitle>
-            <DialogDescription>Update user details</DialogDescription>
+            <DialogDescription>Update user details and roles</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
               <Label>Username (read-only)</Label>
-              <Input disabled value={formData.username} />
+              <Input disabled value={editFormData.username} />
             </div>
             <div>
               <Label>Full Name</Label>
               <Input
-                value={formData.full_name}
-                onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                value={editFormData.full_name}
+                onChange={(e) => setEditFormData({ ...editFormData, full_name: e.target.value })}
                 placeholder="John Doe"
               />
             </div>
@@ -254,8 +360,8 @@ export default function UsersPage() {
               <Label>Email</Label>
               <Input
                 type="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                value={editFormData.email}
+                onChange={(e) => setEditFormData({ ...editFormData, email: e.target.value })}
                 placeholder="john@example.com"
               />
             </div>
@@ -263,10 +369,29 @@ export default function UsersPage() {
               <Label>New Password (optional)</Label>
               <Input
                 type="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                value={editFormData.password}
+                onChange={(e) => setEditFormData({ ...editFormData, password: e.target.value })}
                 placeholder="Leave blank to keep current password"
               />
+            </div>
+            <div>
+              <Label>Role</Label>
+              {loadingRoles ? (
+                <p className="text-sm text-muted-foreground">Loading roles...</p>
+              ) : (
+                <Select value={editFormData.role_id} onValueChange={(value) => setEditFormData({ ...editFormData, role_id: value })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map((role) => (
+                      <SelectItem key={role.id} value={role.id.toString()}>
+                        {role.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="flex gap-2 justify-end pt-4">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
@@ -280,3 +405,4 @@ export default function UsersPage() {
     </div>
   );
 }
+
