@@ -13,6 +13,7 @@ import {
   UserCog,
   LogOut,
   Satellite,
+  Gauge,
 } from "lucide-react";
 import { useAuth } from "@/lib/auth-context";
 import { Badge } from "@/components/ui/badge";
@@ -30,6 +31,7 @@ const navItems = [
 
 const adminItems = [
   { label: "Users", href: "/users", icon: UserCog },
+  { label: "Statuses", href: "/statuses", icon: Gauge },
 ];
 
 export function AppSidebar() {

@@ -22,6 +22,7 @@ export interface Status {
   id: number
   name: string
   description: string
+  status_type: string
 }
 
 // Order
