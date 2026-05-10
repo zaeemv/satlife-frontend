@@ -29,6 +29,7 @@ export default function ModuleDetailPage() {
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const unitFormFields = [
@@ -90,12 +91,25 @@ export default function ModuleDetailPage() {
     useEffect(() => {
         const fetchData = async () => {
           try {
-            const [statusRes, hierarchyRes] = await Promise.all([
+            const [statusRes, moduleHierarchyRes] = await Promise.all([
               api.statuses.list("units"),
-              api.hierarchies.list("unit"),
+              api.hierarchies.list("module"),
             ]);
             setStatuses(statusRes.data);
-            setUnitHierarchyNames(hierarchyRes.data);
+            setModuleHierarchyNames(moduleHierarchyRes.data);
+
+            if (module) {
+              const parentHierarchyId = moduleHierarchyRes.data.find(
+                (hierarchy) => hierarchy.name === module.name
+              )?.id;
+
+              if (parentHierarchyId) {
+                const childRes = await api.hierarchies.list("unit", parentHierarchyId);
+                setUnitHierarchyNames(childRes.data);
+              } else {
+                setUnitHierarchyNames([]);
+              }
+            }
           } catch (err) {
             console.error("Failed to fetch statuses or hierarchy names", err);
           } finally {
@@ -104,7 +118,7 @@ export default function ModuleDetailPage() {
         };
   
         fetchData();
-      }, []);
+      }, [module]);
     if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   if (!module) {

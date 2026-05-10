@@ -28,6 +28,7 @@ export default function SystemDetailPage() {
   const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const subsystemFormFields = [
     {
@@ -99,12 +100,26 @@ export default function SystemDetailPage() {
   useEffect(() => {
       const fetchData = async () => {
         try {
-          const [statusRes, hierarchyRes] = await Promise.all([
+          const [statusRes, systemHierarchyRes] = await Promise.all([
             api.statuses.list("subsystems"),
-            api.hierarchies.list("subsystem"),
+            api.hierarchies.list("system"),
           ]);
+
           setStatuses(statusRes.data);
-          setSubsystemHierarchyNames(hierarchyRes.data);
+          setSystemHierarchyNames(systemHierarchyRes.data);
+
+          if (system) {
+            const parentHierarchyId = systemHierarchyRes.data.find(
+              (hierarchy) => hierarchy.name === system.name
+            )?.id;
+
+            if (parentHierarchyId) {
+              const childRes = await api.hierarchies.list("subsystem", parentHierarchyId);
+              setSubsystemHierarchyNames(childRes.data);
+            } else {
+              setSubsystemHierarchyNames([]);
+            }
+          }
         } catch (err) {
           console.error("Failed to fetch statuses or hierarchy names", err);
         } finally {
@@ -113,7 +128,7 @@ export default function SystemDetailPage() {
       };
 
       fetchData();
-    }, []);
+    }, [system]);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   Trash2,
@@ -92,6 +92,7 @@ export default function HierarchyPage() {
   const [validateSystemId, setValidateSystemId] = useState<number | null>(null);
   const [validateSubsystemId, setValidateSubsystemId] = useState<number | null>(null);
   const [validationResult, setValidationResult] = useState<{ valid: boolean; message: string } | null>(null);
+  const addSectionRef = useRef<HTMLDivElement | null>(null);
 
   const grouped = useMemo(() => buildHierarchyTree(hierarchies), [hierarchies]);
 
@@ -245,7 +246,7 @@ export default function HierarchyPage() {
     if (level === "component") {
       setSelectedUnitId(parent.id);
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    addSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
   const validateAssignment = () => {
@@ -512,12 +513,13 @@ export default function HierarchyPage() {
         </p>
       </div>
 
-      <Card className="shadow-sm">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base font-semibold text-card-foreground">
-            Add Hierarchy Item
-          </CardTitle>
-        </CardHeader>
+      <div ref={addSectionRef}>
+        <Card className="shadow-sm">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base font-semibold text-card-foreground">
+              Add Hierarchy Item
+            </CardTitle>
+          </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
@@ -593,8 +595,9 @@ export default function HierarchyPage() {
               )}
             </div>
           </div>
-        </CardContent>
+          </CardContent>
       </Card>
+      </div>
 
       <Card className="shadow-sm">
         <CardHeader className="pb-3">

@@ -43,6 +43,47 @@ export default function UnitsPage() {
     module_id: 0,
   });
 
+  useEffect(() => {
+    const fetchHierarchyNames = async () => {
+      try {
+        const modulesRes = await api.hierarchies.list('module');
+        setModuleHierarchyNames(modulesRes.data);
+      } catch (err) {
+        console.error('Failed to load module hierarchy names', err);
+      }
+    };
+
+    fetchHierarchyNames();
+  }, []);
+
+  useEffect(() => {
+    const fetchUnitNames = async () => {
+      if (!formData.module_id) {
+        setUnitHierarchyNames([]);
+        return;
+      }
+
+      const selectedModule = modules.find((m) => m.id === formData.module_id);
+      const parentHierarchyId = selectedModule
+        ? moduleHierarchyNames.find((hierarchy) => hierarchy.name === selectedModule.name)?.id
+        : undefined;
+
+      if (!parentHierarchyId) {
+        setUnitHierarchyNames([]);
+        return;
+      }
+
+      try {
+        const res = await api.hierarchies.list('unit', parentHierarchyId);
+        setUnitHierarchyNames(res.data);
+      } catch (err) {
+        console.error('Failed to load unit hierarchy names', err);
+      }
+    };
+
+    fetchUnitNames();
+  }, [formData.module_id, moduleHierarchyNames, modules]);
+
   const filtered = units.filter((u) => {
     const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
       u.description?.toLowerCase().includes(search.toLowerCase());
@@ -104,22 +145,6 @@ export default function UnitsPage() {
     setIsEditOpen(true);
   }
 
-  useEffect(() => {
-    const fetchHierarchyNames = async () => {
-      try {
-        const [modulesRes, unitsRes] = await Promise.all([
-          api.hierarchies.list('module'),
-          api.hierarchies.list('unit'),
-        ]);
-        setModuleHierarchyNames(modulesRes.data);
-        setUnitHierarchyNames(unitsRes.data);
-      } catch (err) {
-        console.error('Failed to load unit hierarchy names', err);
-      }
-    };
-
-    fetchHierarchyNames();
-  }, []);
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -232,7 +257,7 @@ export default function UnitsPage() {
                 <Label>Module *</Label>
                 <Select
                   value={formData.module_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, module_id: parseInt(v) })}
+                  onValueChange={(v) => setFormData({ ...formData, module_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select module" />

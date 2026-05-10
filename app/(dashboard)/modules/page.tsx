@@ -44,6 +44,47 @@ export default function ModulesPage() {
     subsystem_id: 0,
   });
 
+  useEffect(() => {
+    const fetchHierarchyNames = async () => {
+      try {
+        const subsystemsRes = await api.hierarchies.list('subsystem');
+        setSubsystemHierarchyNames(subsystemsRes.data);
+      } catch (err) {
+        console.error('Failed to load subsystem hierarchy names', err);
+      }
+    };
+
+    fetchHierarchyNames();
+  }, []);
+
+  useEffect(() => {
+    const fetchModuleNames = async () => {
+      if (!formData.subsystem_id) {
+        setModuleHierarchyNames([]);
+        return;
+      }
+
+      const selectedSubsystem = subsystems.find((s) => s.id === formData.subsystem_id);
+      const parentHierarchyId = selectedSubsystem
+        ? subsystemHierarchyNames.find((hierarchy) => hierarchy.name === selectedSubsystem.name)?.id
+        : undefined;
+
+      if (!parentHierarchyId) {
+        setModuleHierarchyNames([]);
+        return;
+      }
+
+      try {
+        const res = await api.hierarchies.list('module', parentHierarchyId);
+        setModuleHierarchyNames(res.data);
+      } catch (err) {
+        console.error('Failed to load module hierarchy names', err);
+      }
+    };
+
+    fetchModuleNames();
+  }, [formData.subsystem_id, subsystemHierarchyNames, subsystems]);
+
   const filtered = modules.filter((m) => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
       m.description?.toLowerCase().includes(search.toLowerCase());
@@ -233,7 +274,7 @@ export default function ModulesPage() {
                 <Label>Subsystem *</Label>
                 <Select
                   value={formData.subsystem_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, subsystem_id: parseInt(v) })}
+                  onValueChange={(v) => setFormData({ ...formData, subsystem_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select subsystem" />

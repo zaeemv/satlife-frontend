@@ -43,6 +43,47 @@ export default function ComponentsPage() {
     unit_id: 0,
   });
 
+  useEffect(() => {
+    const fetchHierarchyNames = async () => {
+      try {
+        const unitsRes = await api.hierarchies.list('unit');
+        setUnitHierarchyNames(unitsRes.data);
+      } catch (err) {
+        console.error('Failed to load unit hierarchy names', err);
+      }
+    };
+
+    fetchHierarchyNames();
+  }, []);
+
+  useEffect(() => {
+    const fetchComponentNames = async () => {
+      if (!formData.unit_id) {
+        setComponentHierarchyNames([]);
+        return;
+      }
+
+      const selectedUnit = units.find((u) => u.id === formData.unit_id);
+      const parentHierarchyId = selectedUnit
+        ? unitHierarchyNames.find((hierarchy) => hierarchy.name === selectedUnit.name)?.id
+        : undefined;
+
+      if (!parentHierarchyId) {
+        setComponentHierarchyNames([]);
+        return;
+      }
+
+      try {
+        const res = await api.hierarchies.list('component', parentHierarchyId);
+        setComponentHierarchyNames(res.data);
+      } catch (err) {
+        console.error('Failed to load component hierarchy names', err);
+      }
+    };
+
+    fetchComponentNames();
+  }, [formData.unit_id, unitHierarchyNames, units]);
+
   const filtered = components.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
       c.description?.toLowerCase().includes(search.toLowerCase());
@@ -232,7 +273,7 @@ export default function ComponentsPage() {
                 <Label>Unit *</Label>
                 <Select
                   value={formData.unit_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, unit_id: parseInt(v) })}
+                  onValueChange={(v) => setFormData({ ...formData, unit_id: parseInt(v), name: '' })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select unit" />

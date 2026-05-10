@@ -28,6 +28,7 @@ export default function SubsystemDetailPage() {
   const subsystemModules = subsystem ? modules.filter((m) => m.subsystem_id === subsystem.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const moduleFormFields = [
     {
@@ -99,12 +100,25 @@ export default function SubsystemDetailPage() {
  useEffect(() => {
       const fetchData = async () => {
         try {
-          const [statusRes, hierarchyRes] = await Promise.all([
+          const [statusRes, subsystemHierarchyRes] = await Promise.all([
             api.statuses.list("modules"),
-            api.hierarchies.list("module"),
+            api.hierarchies.list("subsystem"),
           ]);
           setStatuses(statusRes.data);
-          setModuleHierarchyNames(hierarchyRes.data);
+          setSubsystemHierarchyNames(subsystemHierarchyRes.data);
+
+          if (subsystem) {
+            const parentHierarchyId = subsystemHierarchyRes.data.find(
+              (hierarchy) => hierarchy.name === subsystem.name
+            )?.id;
+
+            if (parentHierarchyId) {
+              const childRes = await api.hierarchies.list("module", parentHierarchyId);
+              setModuleHierarchyNames(childRes.data);
+            } else {
+              setModuleHierarchyNames([]);
+            }
+          }
         } catch (err) {
           console.error("Failed to fetch statuses or hierarchy names", err);
         } finally {
@@ -113,7 +127,7 @@ export default function SubsystemDetailPage() {
       };
 
       fetchData();
-    }, []);
+    }, [subsystem]);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
