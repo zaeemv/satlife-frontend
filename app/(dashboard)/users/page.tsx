@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useDataStore } from '@/lib/data-store';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -38,26 +39,35 @@ export default function UsersPage() {
     email: '',
     role_id: '',
   });
+  const [usersWithRoles, setUsersWithRoles] = useState<any[]>([]);
 
-  // Fetch roles on component mount
+  // Fetch available roles and user roles from API
   useEffect(() => {
-    const fetchRoles = async () => {
+    const fetchData = async () => {
       try {
         setLoadingRoles(true);
-        const response = await api.auth.listRoles();
-        console.log('Fetched roles:', response.data);
-        setRoles(response.data);
+
+        const rolesRes = await api.auth.listRoles();
+        console.log("rolesRes OK", rolesRes.data);
+
+        const usersRes = await api.users.usersWithRoles();
+        console.log("usersRes OK", usersRes.data);
+
+        setRoles(rolesRes.data);
+        setUsersWithRoles(usersRes.data);
+
       } catch (err) {
-        console.error('Failed to load roles:', err);
-        toast.error('Failed to load roles');
+        console.error("API ERROR:", err);
+        toast.error("Failed to load data");
       } finally {
         setLoadingRoles(false);
       }
     };
-    fetchRoles();
+
+    fetchData();
   }, []);
 
-  const filtered = users.filter(
+  const filtered = usersWithRoles.filter(
     (u) =>
       u.full_name.toLowerCase().includes(search.toLowerCase()) ||
       u.email.toLowerCase().includes(search.toLowerCase()) ||
@@ -68,9 +78,6 @@ export default function UsersPage() {
   useEffect(() => {
     console.log('Users data:', users);
     console.log('Roles data:', roles);
-    if (users.length > 0) {
-      console.log('First user roles:', users[0].roles);
-    }
   }, [users, roles]);
 
   // Admin-only access
@@ -98,16 +105,16 @@ export default function UsersPage() {
         email: formData.email,
         is_active: true,
       };
-      
+
       const newUser = await createUser(userData);
       console.log('User created:', newUser);
-      
+
       // Assign role to the newly created user
       if (roleId) {
         await api.auth.assignRole(newUser.id, roleId);
         console.log('Role assigned to user:', newUser.id, 'roleId:', roleId);
       }
-      
+
       setFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setIsCreateOpen(false);
       toast.success('User created successfully');
@@ -128,20 +135,20 @@ export default function UsersPage() {
         full_name: editFormData.full_name,
         email: editFormData.email,
       };
-      
+
       if (editFormData.password) {
         userData.password = editFormData.password;
       }
-      
+
       await updateUser(editingId, userData);
       console.log('User updated:', editingId);
-      
+
       if (editFormData.role_id) {
         const roleId = parseInt(editFormData.role_id);
         await api.auth.assignRole(editingId, roleId);
         console.log('Role assigned to user:', editingId, 'roleId:', roleId);
       }
-      
+
       setEditFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setEditingId(null);
       setIsEditOpen(false);
@@ -163,16 +170,19 @@ export default function UsersPage() {
     }
   }
 
-  function openEdit(user: typeof users[0]) {
-    // Map role names to role IDs
-    let roleId = '';
-    if (user.roles && user.roles.length > 0) {
-      const firstRoleName = user.roles[0];
-      const foundRole = roles.find((r) => r.name === firstRoleName);
-      roleId = foundRole ? foundRole.id.toString() : '';
-    }
-    
+  function openEdit(user: typeof filtered[0]) {
+    const firstRoleName = user.roles?.[0] || '';
+
+    const foundRole = roles.find(
+      (r) => r.name === firstRoleName
+    );
+
+    const roleId = foundRole
+      ? foundRole.id.toString()
+      : '';
+
     setEditingId(user.id);
+
     setEditFormData({
       username: user.username,
       password: '',
@@ -180,6 +190,7 @@ export default function UsersPage() {
       email: user.email,
       role_id: roleId,
     });
+
     setIsEditOpen(true);
   }
 

@@ -20,6 +20,7 @@ export const auth = {
   login: (username: string, password: string) =>
     api.post<{ access_token: string; token_type: string }>("/auth/login", { username, password }),
   listRoles: () => api.get("/auth/roles"),
+  getMe: () => api.get("/auth/me"),
   getRole: (id: number) => api.get(`/auth/roles/${id}`),
   assignRole: (userId: number, roleId: number) =>
     api.post("/auth/assign-role", { user_id: userId, role_id: roleId }),
@@ -30,6 +31,7 @@ export const auth = {
 // Users
 export const users = {
   list: (skip = 0, limit = 100) => api.get<Models.User[]>("/users/", { params: { skip, limit } }),
+  usersWithRoles: () => api.get("/users/with-roles"),
   get: (id: number) => api.get<Models.User>(`/users/${id}/`),
   create: (data: Partial<Models.User>) => api.post<Models.User>("/users/", data),
   update: (id: number, data: Partial<Models.User>) => api.put<Models.User>(`/users/${id}/`, data),
