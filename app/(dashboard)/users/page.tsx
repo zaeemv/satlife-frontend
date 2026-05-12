@@ -148,6 +148,10 @@ export default function UsersPage() {
       setEditingId(null);
       setIsEditOpen(false);
       toast.success('User updated successfully');
+      // Smart reload: refetch users
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (err) {
       console.error('Failed to update user:', err);
       toast.error('Failed to update user');
@@ -157,8 +161,12 @@ export default function UsersPage() {
   async function handleDelete(id: number) {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      await deleteUser(id);
+      await api.auth.deregister(id);
       toast.success('User deleted successfully');
+      // Smart reload: refetch users
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (err) {
       console.error('Failed to delete user:', err);
       toast.error('Failed to delete user');

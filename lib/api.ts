@@ -27,12 +27,7 @@ export const auth = {
     api.post("/auth/assign-role", { user_id: userId, role_id: roleId }),
   removeRole: (userId: number, roleId: number) =>
     api.delete("/auth/remove-role", { data: { user_id: userId, role_id: roleId } }),
-  register: (data: {
-    username: string;
-    password: string;
-    full_name: string;
-    email?: string;
-  }) => api.post("/auth/register", data),
+  deregister: (userId: number) => api.delete(`/auth/deregister/${userId}`),
 };
 
 // Users
