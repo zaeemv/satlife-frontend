@@ -124,7 +124,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const refreshData = async () => {
     try {
       console.log("Refreshing data...");
-      api.customers.list(0, 100)        .then(res => console.log("Fetched customers:", res.data))
+      api.customers.list(0, 100).then(res => console.log("Fetched customers:", res.data))
       setLoading(true);
       const [usersRes, customersRes, ordersRes, projectsRes, systemsRes, subsystemsRes, modulesRes, unitsRes, componentsRes, inventoryRes, statusesRes, maintenanceRes] =
         await Promise.all([
@@ -169,6 +169,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     console.log("Refreshing data inside useEffect...");
     refreshData();
   }, []);
+
 
   // Users
   const getUser = async (id: number) => {
@@ -223,7 +224,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       const res = await api.customers.get(id);
       console.log("Fetched customers:", res.data);
       return res.data;
-      
+
     } catch (err) {
       toast.error('Failed to fetch customer');
       throw err;
@@ -324,7 +325,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const createProject = async (data: Partial<Models.Project>) => {
     try {
-     console.log("Created project:");
+      console.log("Created project:");
       const res = await api.projects.create(data);
       console.log("Created project:", res.data);
       setProjects([...projects, res.data]);

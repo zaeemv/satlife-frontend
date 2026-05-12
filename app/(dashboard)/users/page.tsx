@@ -92,32 +92,27 @@ export default function UsersPage() {
   }
 
   async function handleCreate() {
-    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim() || !formData.role_id) {
+    if (!formData.username.trim() || !formData.password.trim() || !formData.full_name.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
     try {
-      const roleId = parseInt(formData.role_id);
+      // Use the register API (Viewer role assigned by default)
       const userData: any = {
         username: formData.username,
         password: formData.password,
         full_name: formData.full_name,
         email: formData.email,
-        is_active: true,
       };
-
-      const newUser = await createUser(userData);
-      console.log('User created:', newUser);
-
-      // Assign role to the newly created user
-      if (roleId) {
-        await api.auth.assignRole(newUser.id, roleId);
-        console.log('Role assigned to user:', newUser.id, 'roleId:', roleId);
-      }
-
+      const res = await api.auth.register(userData);
+      console.log('User registered:', res.data);
       setFormData({ username: '', password: '', full_name: '', email: '', role_id: '' });
       setIsCreateOpen(false);
       toast.success('User created successfully');
+      // Smart reload: refetch users
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
     } catch (err) {
       console.error('Failed to create user:', err);
       toast.error('Failed to create user');
@@ -259,25 +254,6 @@ export default function UsersPage() {
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                   placeholder="Set initial password"
                 />
-              </div>
-              <div>
-                <Label>Role *</Label>
-                {loadingRoles ? (
-                  <p className="text-sm text-muted-foreground">Loading roles...</p>
-                ) : (
-                  <Select value={formData.role_id} onValueChange={(value) => setFormData({ ...formData, role_id: value })}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {roles.map((role) => (
-                        <SelectItem key={role.id} value={role.id.toString()}>
-                          {role.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
               </div>
               <div className="flex gap-2 justify-end pt-4">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
