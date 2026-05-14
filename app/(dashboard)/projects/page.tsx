@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { usePermissions, hasPermission } from '@/lib/permissions';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -20,6 +21,7 @@ import Link from 'next/link';
 export default function ProjectsPage(){
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { permissions, loading: loadingPerms } = usePermissions();
   const { projects, users, orders, loading, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
   const [search, setSearch] = useState('');
   
