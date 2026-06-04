@@ -122,7 +122,7 @@ export default function ProjectDetailPage() {
         const fetchData = async () => {
           try {
             const [statusRes, hierarchyRes] = await Promise.all([
-              api.statuses.list("systems"),
+              api.statuses.list("system"),
               api.hierarchies.list("system"),
             ]);
             setStatuses(statusRes.data);
