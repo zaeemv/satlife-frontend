@@ -46,6 +46,13 @@ export default function SubsystemDetailPage() {
       placeholder: 'Enter module description',
     },
     {
+      name: 'partnumber',
+      label: 'Part #',
+      type: 'text' as const,
+      required: false,
+      placeholder: 'Enter Part Number of Module',
+    },
+    {
       name: 'status_id',
       label: 'Status',
       type: 'select' as const,
@@ -66,6 +73,10 @@ export default function SubsystemDetailPage() {
         description: formData.description || '',
         subsystem_id: subsystem.id,
         status_id: Number(formData.status_id),
+        part_number:formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Module added successfully');

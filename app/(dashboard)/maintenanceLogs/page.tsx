@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+import type * as Models from '@/lib/models';
+import { entities } from '@/lib/api';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,45 +15,90 @@ import { Plus, Eye, Search } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function MaintenancePage() {
-  const { maintenanceLogs, components, users, loading, createMaintenanceLog } = useDataStore();
+  const { maintenanceLogs, users, loading, createMaintenanceLog } = useDataStore();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedLog, setSelectedLog] = useState<typeof maintenanceLogs[0] | null>(null);
   const [formData, setFormData] = useState({
-    component_id: 0,
-    technician_id: 0,
-    description: '',
+    part_number: '',
+    entity_id: 0,
+    performed_by: 0,
+    notes: '',
     maintenance_type: 'preventive',
   });
+  type LookupEntity = Models.Entity & {
+    parents?: Models.Entity[];
+    children?: Models.Entity[];
+  };
+  const [lookupResult, setLookupResult] = useState<LookupEntity | null>(null);
+  const [lookupError, setLookupError] = useState('');
+  const [isLookupLoading, setIsLookupLoading] = useState(false);
 
   const filtered = maintenanceLogs.filter((log) => {
-    const component = components.find((c) => c.id === log.component_id);
+    const entityName = log.entity?.display_name || `Entity #${log.entity_id}`;
     const matchesSearch =
-      component?.name.toLowerCase().includes(search.toLowerCase()) ||
-      log.description.toLowerCase().includes(search.toLowerCase());
+      entityName.toLowerCase().includes(search.toLowerCase()) ||
+      (log.notes?.toLowerCase() ?? '').includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || log.maintenance_type === statusFilter;
     return matchesSearch && matchesStatus;
   });
 
   async function handleCreate() {
-    if (!formData.component_id || !formData.technician_id || !formData.description.trim()) {
+    if (!formData.entity_id || !formData.performed_by || !formData.notes.trim()) {
       toast.error('Please fill in all required fields');
       return;
     }
     try {
-      await createMaintenanceLog(formData);
+      await createMaintenanceLog({
+        entity_id: formData.entity_id,
+        performed_by: formData.performed_by,
+        notes: formData.notes,
+        maintenance_type: formData.maintenance_type,
+      });
       setFormData({
-        component_id: 0,
-        technician_id: 0,
-        description: '',
+        part_number: '',
+        entity_id: 0,
+        performed_by: 0,
+        notes: '',
         maintenance_type: 'preventive',
       });
+      setLookupResult(null);
+      setLookupError('');
       setIsCreateOpen(false);
     } catch {
       // Error handled by DataStore
     }
   }
+
+  const handleLookup = async () => {
+    if (!formData.part_number.trim()) {
+      toast.error('Enter a part number to lookup');
+      return;
+    }
+
+    setLookupError('');
+    setIsLookupLoading(true);
+
+    try {
+      const res = await entities.lookupByPartNumber(formData.part_number.trim());
+      const entity = res.data as LookupEntity;
+
+      if (!entity || !entity.id) {
+        throw new Error('No entity found for that part number');
+      }
+
+      setLookupResult(entity);
+      setFormData((prev) => ({ ...prev, entity_id: entity.id }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Lookup failed';
+      setLookupResult(null);
+      setLookupError(message);
+      toast.error(message);
+    } finally {
+      setIsLookupLoading(false);
+    }
+  };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -59,14 +106,14 @@ export default function MaintenancePage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">maintenanceLogs</h1>
-        <p className="text-muted-foreground mt-2">Track component maintenanceLogs history</p>
+        <p className="text-muted-foreground mt-2">Find an entity by part number, inspect its hierarchy, and log maintenance activity.</p>
       </div>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by component or description..."
+            placeholder="Search by entity name or notes..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
@@ -96,24 +143,59 @@ export default function MaintenancePage() {
               <DialogDescription>Record a maintenanceLogs activity</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
-              <div>
-                <Label>Component *</Label>
-                <Select
-                  value={formData.component_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, component_id: parseInt(v) })}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select component" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {components.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="space-y-2">
+                <Label htmlFor="part_number">Part Number *</Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="part_number"
+                    value={formData.part_number}
+                    onChange={(e) => setFormData({ ...formData, part_number: e.target.value })}
+                    placeholder="Enter part number to search"
+                  />
+                  <Button type="button" onClick={handleLookup} disabled={isLookupLoading}>
+                    {isLookupLoading ? 'Searching...' : 'Lookup'}
+                  </Button>
+                </div>
+                {lookupError && (
+                  <p className="text-sm text-destructive">{lookupError}</p>
+                )}
               </div>
+
+              {lookupResult && (
+                <div className="rounded-lg border p-4 bg-muted/5">
+                  <p className="text-sm font-semibold">{lookupResult.display_name}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Type: {lookupResult.entity_type}
+                  </p>
+                  <p className="text-sm text-muted-foreground">ID: {lookupResult.id}</p>
+
+                  {lookupResult.parents?.length ? (
+                    <div className="mt-3">
+                      <p className="text-sm font-medium">Parent hierarchy</p>
+                      <ul className="list-disc list-inside text-sm">
+                        {lookupResult.parents.map((parent) => (
+                          <li key={parent.id}>
+                            {parent.entity_type} · {parent.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+
+                  {lookupResult.children?.length ? (
+                    <div className="mt-3">
+                      <p className="text-sm font-medium">Child hierarchy</p>
+                      <ul className="list-disc list-inside text-sm">
+                        {lookupResult.children.map((child) => (
+                          <li key={child.id}>
+                            {child.entity_type} · {child.display_name}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
+                </div>
+              )}
               <div>
                 <Label>Type *</Label>
                 <Select
@@ -133,8 +215,8 @@ export default function MaintenancePage() {
               <div>
                 <Label>Technician *</Label>
                 <Select
-                  value={formData.technician_id.toString()}
-                  onValueChange={(v) => setFormData({ ...formData, technician_id: parseInt(v) })}
+                  value={formData.performed_by.toString()}
+                  onValueChange={(v) => setFormData({ ...formData, performed_by: parseInt(v) })}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select technician" />
@@ -149,11 +231,11 @@ export default function MaintenancePage() {
                 </Select>
               </div>
               <div>
-                <Label>Description *</Label>
+                <Label>Notes *</Label>
                 <Input
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="maintenanceLogs details"
+                  value={formData.notes}
+                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  placeholder="Describe the maintenance work or issue"
                   className="h-20"
                 />
               </div>
@@ -178,7 +260,7 @@ export default function MaintenancePage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Component</TableHead>
+                  <TableHead>Entity</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Technician</TableHead>
                   <TableHead>Date</TableHead>
@@ -194,11 +276,11 @@ export default function MaintenancePage() {
                   </TableRow>
                 ) : (
                   filtered.map((log) => {
-                    const component = components.find((c) => c.id === log.component_id);
-                    const technician = users.find((u) => u.id === log.technician_id);
+                    const entityName = log.entity?.display_name || `Entity #${log.entity_id}`;
+                    const technician = users.find((u) => u.id === log.performed_by);
                     return (
                       <TableRow key={log.id}>
-                        <TableCell className="font-medium">{component?.name || 'N/A'}</TableCell>
+                        <TableCell className="font-medium">{entityName}</TableCell>
                         <TableCell className="capitalize">{log.maintenance_type}</TableCell>
                         <TableCell>{technician?.full_name || 'N/A'}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">
@@ -231,8 +313,10 @@ export default function MaintenancePage() {
           {selectedLog && (
             <div className="space-y-4">
               <div>
-                <Label>Component</Label>
-                <p className="text-sm">{components.find((c) => c.id === selectedLog.component_id)?.name}</p>
+                <Label>Entity</Label>
+                <p className="text-sm">
+                  {selectedLog.entity?.display_name || `Entity #${selectedLog.entity_id}`}
+                </p>
               </div>
               <div>
                 <Label>Type</Label>
@@ -240,15 +324,17 @@ export default function MaintenancePage() {
               </div>
               <div>
                 <Label>Technician</Label>
-                <p className="text-sm">{users.find((u) => u.id === selectedLog.technician_id)?.full_name}</p>
+                <p className="text-sm">
+                  {users.find((u) => u.id === selectedLog.performed_by)?.full_name}
+                </p>
               </div>
               <div>
                 <Label>Date</Label>
                 <p className="text-sm">{new Date(selectedLog.created_at).toLocaleString()}</p>
               </div>
               <div>
-                <Label>Description</Label>
-                <p className="text-sm whitespace-pre-wrap">{selectedLog.description}</p>
+                <Label>Notes</Label>
+                <p className="text-sm whitespace-pre-wrap">{selectedLog.notes}</p>
               </div>
             </div>
           )}

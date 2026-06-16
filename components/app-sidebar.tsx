@@ -26,7 +26,7 @@ const navItems = [
   { label: "Projects", href: "/projects", icon: Rocket },
   { label: "Systems Hierarchy", href: "/hierarchy", icon: Network },
   { label: "Inventory", href: "/inventory", icon: Package },
-  { label: "Maintenance", href: "/maintenanceLogs", icon: Wrench },
+  { label: "Maintenance", href: "/maintenance", icon: Wrench },
 ];
 
 const adminItems = [

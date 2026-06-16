@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { usePermissions, hasPermission } from '@/lib/permissions';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -21,7 +20,6 @@ import Link from 'next/link';
 export default function ProjectsPage(){
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { permissions, loading: loadingPerms } = usePermissions();
   const { projects, users, orders, loading, createProject, updateProject, deleteProject, getEntityMaintenanceLogs } = useDataStore();
   const [search, setSearch] = useState('');
   
@@ -47,6 +45,7 @@ export default function ProjectsPage(){
     const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.description.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || p.status?.name === statusFilter;
+    console.log('Filtering project:', p.name, 'Matches Search:', matchesSearch, 'Matches Status:', matchesStatus);
     return matchesSearch && matchesStatus;
   });
 
@@ -145,7 +144,7 @@ export default function ProjectsPage(){
     }, []);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
   const statusNames = statuses.map((status) => status.name);
-  console.log(statusNames)
+  // console.log(statusNames)
   return (
     <div className="space-y-8">
       <div>
@@ -184,7 +183,7 @@ export default function ProjectsPage(){
             {/* {['Initiation', 'Planning', 'Execution', 'Monitoring', 'Completed', 'On Hold'] */}
             {statusNames.map((s) => {
               const count = projects.filter(p => p.status?.name === s).length;
-              console.log(`Status: ${s}, Count: ${count}`, projects);
+              // console.log(`Status: ${s}, Count: ${count}`, projects);
               const icons: Record<string, any> = {
                 'Initiation': Clock,
                 'Planning': Presentation,

@@ -48,6 +48,13 @@ export default function ModuleDetailPage() {
       placeholder: 'Enter unit description',
     },
     {
+      name: 'partnumber',
+      label: 'Part #',
+      type: 'text' as const,
+      required: false,
+      placeholder: 'Enter Part Number of Unit',
+    },
+    {
       name: 'status_id',
       label: 'Status',
       type: 'select' as const,
@@ -68,6 +75,10 @@ export default function ModuleDetailPage() {
         description: formData.description || '',
         module_id: module.id,
         status_id: Number(formData.status_id),
+        part_number:formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Unit added successfully');

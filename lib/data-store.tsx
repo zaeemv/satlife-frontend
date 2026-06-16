@@ -1,8 +1,11 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import type { AxiosResponse } from 'axios';
 import * as api from './api';
+// import * as maintenanceApi from '@/lib/maintenance';
 import * as Models from './models';
+import * as MaintenanceTypes from '@/lib/models';
 import { toast } from 'sonner';
 
 interface DataStoreContextType {
@@ -19,6 +22,10 @@ interface DataStoreContextType {
   inventory: Models.Inventory[];
   statuses: Models.Status[];
   maintenanceLogs: Models.MaintenanceLog[];
+  maintenanceCases: MaintenanceTypes.MaintenanceCase[];
+  faultyEntities: MaintenanceTypes.FaultyEntity[];
+  maintenanceActions: MaintenanceTypes.MaintenanceAction[];
+  maintenanceDeliveries: MaintenanceTypes.MaintenanceDelivery[];
 
   // Loading states
   loading: boolean;
@@ -99,6 +106,37 @@ interface DataStoreContextType {
   getEntityMaintenanceLogs: (entityId: number) => Promise<Models.MaintenanceLog[]>;
   getEntityStatusHistory: (entityId: number) => Promise<Models.EntityStatusHistory[]>;
 
+  // Maintenance Cases
+  getMaintenanceCase: (id: number) => Promise<MaintenanceTypes.MaintenanceCase>;
+  createMaintenanceCase: (data: MaintenanceTypes.CreateMaintenanceCasePayload) => Promise<MaintenanceTypes.MaintenanceCase>;
+  updateMaintenanceCase: (id: number, data: MaintenanceTypes.UpdateMaintenanceCasePayload) => Promise<MaintenanceTypes.MaintenanceCase>;
+  deleteMaintenanceCase: (id: number) => Promise<void>;
+  lookupEntityByPartNumber: (partNumber: string) => Promise<MaintenanceTypes.lookUpResponse>;
+  suspectChildren: (case_Id: number, data: MaintenanceTypes.SuspectChildrenPayload) => Promise<any>;
+  confirmFault: (caseId: number, data: MaintenanceTypes.ConfirmFaultPayload) => Promise<any>;
+
+  // Faulty Entities
+  getFaultyEntity: (id: number) => Promise<MaintenanceTypes.FaultyEntity>;
+  createFaultyEntity: (data: MaintenanceTypes.CreateFaultyEntityPayload) => Promise<MaintenanceTypes.FaultyEntity>;
+  updateFaultyEntity: (id: number, data: MaintenanceTypes.UpdateFaultyEntityPayload) => Promise<MaintenanceTypes.FaultyEntity>;
+  // update_faulty_Children: (id: number, data: MaintenanceTypes.UpdateFaultyEntityPayload) => Promise<MaintenanceTypes.FaultyEntity>;
+  deleteFaultyEntity: (id: number) => Promise<void>;
+  cascadeFault: (entityId: number, faultType: string) => Promise<void>;
+  getEntityMaintenanceHistory: (entityId: number) => Promise<MaintenanceTypes.MaintenanceAction[]>;
+
+  // Maintenance Actions
+  getMaintenanceAction: (id: number) => Promise<MaintenanceTypes.MaintenanceAction>;
+  createMaintenanceAction: (data: MaintenanceTypes.CreateMaintenanceActionPayload) => Promise<MaintenanceTypes.MaintenanceAction>;
+  updateMaintenanceAction: (id: number, data: MaintenanceTypes.UpdateMaintenanceActionPayload) => Promise<MaintenanceTypes.MaintenanceAction>;
+  deleteMaintenanceAction: (id: number) => Promise<void>;
+
+  // Maintenance Deliveries
+  getMaintenanceDelivery: (id: number) => Promise<MaintenanceTypes.MaintenanceDelivery>;
+  createMaintenanceDelivery: (data: MaintenanceTypes.CreateMaintenanceDeliveryPayload) => Promise<MaintenanceTypes.MaintenanceDelivery>;
+  updateMaintenanceDelivery: (id: number, data: MaintenanceTypes.UpdateMaintenanceDeliveryPayload) => Promise<MaintenanceTypes.MaintenanceDelivery>;
+  confirmMaintenanceDelivery: (id: number, receivedBy: string) => Promise<MaintenanceTypes.MaintenanceDelivery>;
+  deleteMaintenanceDelivery: (id: number) => Promise<void>;
+
   // Refresh
   refreshData: () => Promise<void>;
 }
@@ -118,43 +156,83 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const [inventory, setInventory] = useState<Models.Inventory[]>([]);
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [maintenanceLogs, setMaintenanceLogs] = useState<Models.MaintenanceLog[]>([]);
+  const [maintenanceCases, setMaintenanceCases] = useState<MaintenanceTypes.MaintenanceCase[]>([]);
+  const [faultyEntities, setFaultyEntities] = useState<MaintenanceTypes.FaultyEntity[]>([]);
+  const [maintenanceActions, setMaintenanceActions] = useState<MaintenanceTypes.MaintenanceAction[]>([]);
+  const [maintenanceDeliveries, setMaintenanceDeliveries] = useState<MaintenanceTypes.MaintenanceDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const refreshData = async () => {
+    const setResult = <T,>(
+      result: PromiseSettledResult<AxiosResponse<T>>,
+      setter: React.Dispatch<React.SetStateAction<T>>,
+      name: string
+    ) => {
+      if (result.status === 'fulfilled') {
+        setter(result.value.data);
+      } else {
+        console.warn(`Failed to refresh ${name}:`, result.reason);
+      }
+    };
+
     try {
-      console.log("Refreshing data...");
-      api.customers.list(0, 100).then(res => console.log("Fetched customers:", res.data))
+      // console.log('Refreshing data...');
       setLoading(true);
-      const [usersRes, customersRes, ordersRes, projectsRes, systemsRes, subsystemsRes, modulesRes, unitsRes, componentsRes, inventoryRes, statusesRes, maintenanceRes] =
-        await Promise.all([
-          api.users.list(0, 100),
-          api.customers.list(0, 100),
-          api.orders.list(0, 100),
-          api.projects.list(0, 100),
-          api.systems.list(0, 100),
-          api.subsystems.list(0, 100),
-          api.modules.list(0, 100),
-          api.units.list(0, 100),
-          api.components.list(0, 100),
-          api.inventory.list(0, 100),
-          //api.statuses.list(0, 100),
-          //api.maintenanceLogs.list(0, 100),
-        ]);
-      console.log("Fetched customers:", customersRes.data);
-      setUsers(usersRes.data);
-      setCustomers(customersRes.data);
-      setOrders(ordersRes.data);
-      setProjects(projectsRes.data);
-      setSystems(systemsRes.data);
-      setSubsystems(subsystemsRes.data);
-      setModules(modulesRes.data);
-      setUnits(unitsRes.data);
-      setComponents(componentsRes.data);
-      setInventory(inventoryRes.data);
-      //setStatuses(statusesRes.data);
-      //console.log("Fetched statuses:", statusesRes.data);
-      //setMaintenanceLogs(maintenanceRes.data);
+
+      const [
+        usersRes,
+        customersRes,
+        ordersRes,
+        projectsRes,
+        systemsRes,
+        subsystemsRes,
+        modulesRes,
+        unitsRes,
+        componentsRes,
+        inventoryRes,
+        statusesRes,
+        maintenanceLogsRes,
+        maintenanceCasesRes,
+        faultyEntitiesRes,
+        maintenanceActionsRes,
+        maintenanceDeliveriesRes,
+      ] = await Promise.allSettled([
+        api.users.list(0, 100),
+        api.customers.list(0, 100),
+        api.orders.list(0, 100),
+        api.projects.list(0, 100),
+        api.systems.list(0, 100),
+        api.subsystems.list(0, 100),
+        api.modules.list(0, 100),
+        api.units.list(0, 100),
+        api.components.list(0, 100),
+        api.inventory.list(0, 100),
+        api.statuses.list(),
+        api.maintenanceLogs.list(0, 100),
+        api.maintenanceCases.list(0, 100),
+        api.faultyEntities.list(0, 100),
+        api.maintenanceActions.list(0, 100),
+        api.maintenanceDeliveries.list(0, 100),
+      ]);
+
+      setResult(usersRes, setUsers, 'users');
+      setResult(customersRes, setCustomers, 'customers');
+      setResult(ordersRes, setOrders, 'orders');
+      setResult(projectsRes, setProjects, 'projects');
+      setResult(systemsRes, setSystems, 'systems');
+      setResult(subsystemsRes, setSubsystems, 'subsystems');
+      setResult(modulesRes, setModules, 'modules');
+      setResult(unitsRes, setUnits, 'units');
+      setResult(componentsRes, setComponents, 'components');
+      setResult(inventoryRes, setInventory, 'inventory');
+      setResult(statusesRes, setStatuses, 'statuses');
+      setResult(maintenanceLogsRes, setMaintenanceLogs, 'maintenanceLogs');
+      setResult(maintenanceCasesRes, setMaintenanceCases, 'maintenanceCases');
+      setResult(faultyEntitiesRes, setFaultyEntities, 'faultyEntities');
+      setResult(maintenanceActionsRes, setMaintenanceActions, 'maintenanceActions');
+      setResult(maintenanceDeliveriesRes, setMaintenanceDeliveries, 'maintenanceDeliveries');
+
       setError(null);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to load data';
@@ -166,7 +244,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    console.log("Refreshing data inside useEffect...");
+    // console.log("Refreshing data inside useEffect...");
     refreshData();
   }, []);
 
@@ -220,9 +298,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   // Customers
   const getCustomer = async (id: number) => {
     try {
-      console.log("Fetching customer with ID:", id);
+      // console.log("Fetching customer with ID:", id);
       const res = await api.customers.get(id);
-      console.log("Fetched customers:", res.data);
+      // console.log("Fetched customers:", res.data);
       return res.data;
 
     } catch (err) {
@@ -325,9 +403,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const createProject = async (data: Partial<Models.Project>) => {
     try {
-      console.log("Created project:");
+      // console.log("Created project:");
       const res = await api.projects.create(data);
-      console.log("Created project:", res.data);
+      // console.log("Created project:", res.data);
       setProjects([...projects, res.data]);
       toast.success('Project created successfully');
       return res.data;
@@ -755,6 +833,266 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  // Maintenance Cases
+  const getMaintenanceCase = async (id: number) => {
+    try {
+      const res = await api.maintenanceCases.get(id);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to fetch maintenance case');
+      throw err;
+    }
+  };
+
+  const createMaintenanceCase = async (data: MaintenanceTypes.CreateMaintenanceCasePayload) => {
+    try {
+      const res = await api.maintenanceCases.create(data);
+      setMaintenanceCases([...maintenanceCases, res.data]);
+      toast.success('Maintenance case created successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to create maintenance case');
+      throw err;
+    }
+  };
+
+  const updateMaintenanceCase = async (id: number, data: MaintenanceTypes.UpdateMaintenanceCasePayload) => {
+    try {
+      const res = await api.maintenanceCases.update(id, data);
+      setMaintenanceCases(maintenanceCases.map((c) => (c.id === id ? res.data : c)));
+      toast.success('Maintenance case updated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update maintenance case');
+      throw err;
+    }
+  };
+
+  const deleteMaintenanceCase = async (id: number) => {
+    try {
+      await api.maintenanceCases.delete(id);
+      setMaintenanceCases(maintenanceCases.filter((c) => c.id !== id));
+      toast.success('Maintenance case deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete maintenance case');
+      throw err;
+    }
+  };
+
+  const lookupEntityByPartNumber = async (partNumber: string) => {
+    try {
+      const res = await api.maintenanceCases.lookupEntityByPartNumber(partNumber);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to lookup entity by part number');
+      throw err;
+    }
+  };
+
+  const suspectChildren = async (caseId: number, data: MaintenanceTypes.SuspectChildrenPayload) => {
+    try {
+      const res = await api.maintenanceCases.suspectChildren(caseId, data);
+      toast.success('Suspect children generated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to create suspect children');
+      throw err;
+    }
+  };
+
+  const confirmFault = async (caseId: number, data: MaintenanceTypes.ConfirmFaultPayload) => {
+    try {
+      const res = await api.maintenanceCases.confirmFault(caseId, data);
+      toast.success('Fault confirmed successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to confirm fault');
+      throw err;
+    }
+  };
+
+  // Faulty Entities
+  const getFaultyEntity = async (id: number) => {
+    try {
+      const res = await api.faultyEntities.get(id);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to fetch faulty entity');
+      throw err;
+    }
+  };
+
+  const createFaultyEntity = async (data: MaintenanceTypes.CreateFaultyEntityPayload) => {
+    try {
+      const res = await api.faultyEntities.create(data);
+      setFaultyEntities([...faultyEntities, res.data]);
+      toast.success('Faulty entity created successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to create faulty entity');
+      throw err;
+    }
+  };
+
+  const updateFaultyEntity = async (id: number, data: MaintenanceTypes.UpdateFaultyEntityPayload) => {
+    try {
+      const res = await api.faultyEntities.update(id, data);
+      setFaultyEntities(faultyEntities.map((e) => (e.id === id ? res.data : e)));
+      toast.success('Faulty entity updated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update faulty entity');
+      throw err;
+    }
+  };
+
+  const update_faulty_Children = async (id: number, data: MaintenanceTypes.UpdateFaultyEntityPayload) => {
+    try {
+      const res = await api.faultyEntities.updateChildren(id, data);
+      setFaultyEntities(faultyEntities.map((e) => (e.id === id ? res.data : e)));
+      toast.success('Faulty entity updated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update faulty entity');
+      throw err;
+    }
+  };
+
+  const deleteFaultyEntity = async (id: number) => {
+    try {
+      await api.faultyEntities.delete(id);
+      setFaultyEntities(faultyEntities.filter((e) => e.id !== id));
+      toast.success('Faulty entity deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete faulty entity');
+      throw err;
+    }
+  };
+
+  const cascadeFault = async (entityId: number, faultType: string) => {
+    try {
+      await api.faultyEntities.cascadeFault(entityId, faultType);
+      toast.success('Fault cascaded successfully');
+    } catch (err) {
+      toast.error('Failed to cascade fault');
+      throw err;
+    }
+  };
+
+  const getEntityMaintenanceHistory = async (entityId: number) => {
+    try {
+      const res = await api.faultyEntities.getMaintenanceHistory(entityId);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to fetch maintenance history');
+      throw err;
+    }
+  };
+
+  // Maintenance Actions
+  const getMaintenanceAction = async (id: number) => {
+    try {
+      const res = await api.maintenanceActions.get(id);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to fetch maintenance action');
+      throw err;
+    }
+  };
+
+  const createMaintenanceAction = async (data: MaintenanceTypes.CreateMaintenanceActionPayload) => {
+    try {
+      const res = await api.maintenanceActions.create(data);
+      setMaintenanceActions([...maintenanceActions, res.data]);
+      toast.success('Maintenance action created successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to create maintenance action');
+      throw err;
+    }
+  };
+
+  const updateMaintenanceAction = async (id: number, data: MaintenanceTypes.UpdateMaintenanceActionPayload) => {
+    try {
+      const res = await api.maintenanceActions.update(id, data);
+      setMaintenanceActions(maintenanceActions.map((a) => (a.id === id ? res.data : a)));
+      toast.success('Maintenance action updated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update maintenance action');
+      throw err;
+    }
+  };
+
+  const deleteMaintenanceAction = async (id: number) => {
+    try {
+      await api.maintenanceActions.delete(id);
+      setMaintenanceActions(maintenanceActions.filter((a) => a.id !== id));
+      toast.success('Maintenance action deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete maintenance action');
+      throw err;
+    }
+  };
+
+  // Maintenance Deliveries
+  const getMaintenanceDelivery = async (id: number) => {
+    try {
+      const res = await api.maintenanceDeliveries.get(id);
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to fetch maintenance delivery');
+      throw err;
+    }
+  };
+
+  const createMaintenanceDelivery = async (data: MaintenanceTypes.CreateMaintenanceDeliveryPayload) => {
+    try {
+      const res = await api.maintenanceDeliveries.create(data);
+      setMaintenanceDeliveries([...maintenanceDeliveries, res.data]);
+      toast.success('Maintenance delivery created successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to create maintenance delivery');
+      throw err;
+    }
+  };
+
+  const updateMaintenanceDelivery = async (id: number, data: MaintenanceTypes.UpdateMaintenanceDeliveryPayload) => {
+    try {
+      const res = await api.maintenanceDeliveries.update(id, data);
+      setMaintenanceDeliveries(maintenanceDeliveries.map((d) => (d.id === id ? res.data : d)));
+      toast.success('Maintenance delivery updated successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to update maintenance delivery');
+      throw err;
+    }
+  };
+
+  const confirmMaintenanceDelivery = async (id: number, receivedBy: string) => {
+    try {
+      const res = await api.maintenanceDeliveries.confirm(id, receivedBy);
+      setMaintenanceDeliveries(maintenanceDeliveries.map((d) => (d.id === id ? res.data : d)));
+      toast.success('Maintenance delivery confirmed successfully');
+      return res.data;
+    } catch (err) {
+      toast.error('Failed to confirm maintenance delivery');
+      throw err;
+    }
+  };
+
+  const deleteMaintenanceDelivery = async (id: number) => {
+    try {
+      await api.maintenanceDeliveries.delete(id);
+      setMaintenanceDeliveries(maintenanceDeliveries.filter((d) => d.id !== id));
+      toast.success('Maintenance delivery deleted successfully');
+    } catch (err) {
+      toast.error('Failed to delete maintenance delivery');
+      throw err;
+    }
+  };
+
   const value: DataStoreContextType = {
     users,
     customers,
@@ -768,6 +1106,10 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     inventory,
     statuses,
     maintenanceLogs,
+    maintenanceCases,
+    faultyEntities,
+    maintenanceActions,
+    maintenanceDeliveries,
     loading,
     error,
     getUser,
@@ -821,6 +1163,29 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     createMaintenanceLog,
     getEntityMaintenanceLogs,
     getEntityStatusHistory,
+    getMaintenanceCase,
+    createMaintenanceCase,
+    updateMaintenanceCase,
+    deleteMaintenanceCase,
+    lookupEntityByPartNumber,
+    suspectChildren,
+    confirmFault,
+    getFaultyEntity,
+    createFaultyEntity,
+    updateFaultyEntity,
+    // update_faulty_Children,
+    deleteFaultyEntity,
+    cascadeFault,
+    getEntityMaintenanceHistory,
+    getMaintenanceAction,
+    createMaintenanceAction,
+    updateMaintenanceAction,
+    deleteMaintenanceAction,
+    getMaintenanceDelivery,
+    createMaintenanceDelivery,
+    updateMaintenanceDelivery,
+    confirmMaintenanceDelivery,
+    deleteMaintenanceDelivery,
     refreshData,
   };
 

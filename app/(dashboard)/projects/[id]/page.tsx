@@ -52,6 +52,13 @@ export default function ProjectDetailPage() {
       required: false,
       placeholder: 'Enter system description',
     },
+    {  
+      name: 'partnumber',
+      label: 'Part #',
+      type: 'text' as const,
+      required: false,
+      placeholder: 'Enter Part Number of System',
+    },
     // {
     //   name: 'project_id',
     //   label: 'Project',
@@ -86,6 +93,11 @@ export default function ProjectDetailPage() {
         description: formData.description || '',
         project_id: formData.project_id ? Number(formData.project_id) : project.id,
         status_id: Number(formData.status_id),
+        part_number:formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || ""
+
       });
       setIsAddOpen(false);
       toast.success('System added successfully');
@@ -122,7 +134,7 @@ export default function ProjectDetailPage() {
         const fetchData = async () => {
           try {
             const [statusRes, hierarchyRes] = await Promise.all([
-              api.statuses.list("system"),
+              api.statuses.list("systems"),
               api.hierarchies.list("system"),
             ]);
             setStatuses(statusRes.data);

@@ -1,6 +1,6 @@
 "use client";
 
-import { type LucideIcon, TrendingUp, TrendingDown } from "lucide-react";
+import { type LucideIcon, TrendingUp, TrendingDown, TrendingUpDown  } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -31,24 +31,27 @@ const iconBgStyles = {
 };
 
 export function KPICard({ title, value, change, icon: Icon, accentColor }: KPICardProps) {
-  const isPositive = change >= 0;
+  const isPositive = change > 0;
 
   return (
-    <Card className={cn("border-l-4 shadow-sm", accentStyles[accentColor])}>
-      <CardContent className="flex items-center justify-between p-5">
+    <Card className={cn("border-l-4 h-full shadow-sm", accentStyles[accentColor])}>
+      <CardContent className="flex items-center justify-between p-5 h-28">
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">{title}</p>
           <p className="text-2xl font-bold tracking-tight text-card-foreground">{value}</p>
           <div className="flex items-center gap-1">
-            {isPositive ? (
+            {change > 0 ? (
               <TrendingUp className="h-3 w-3 text-emerald-500" />
-            ) : (
+            ):
+            change == 0 ?  (<TrendingUpDown  className="h-3 w-3 text-blue-500" />)
+            : 
+            ( 
               <TrendingDown className="h-3 w-3 text-red-500" />
             )}
             <span
               className={cn(
                 "text-xs font-medium",
-                isPositive ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"
+                change > 0 ? "text-emerald-600 dark:text-emerald-400" : change == 0? "text-blue-600  dark:text-blue-400": "text-red-600 dark:text-red-400"
               )}
             >
               {isPositive ? "+" : ""}{change}%
@@ -56,9 +59,10 @@ export function KPICard({ title, value, change, icon: Icon, accentColor }: KPICa
           </div>
         </div>
         <div className={cn("flex h-12 w-12 items-center justify-center rounded-xl", iconBgStyles[accentColor])}>
-          <Icon className="h-6 w-6" />
+          <Icon className="h-4 w-4" />
         </div>
       </CardContent>
     </Card>
   );
 }
+ 

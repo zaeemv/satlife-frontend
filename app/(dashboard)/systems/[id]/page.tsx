@@ -46,12 +46,20 @@ export default function SystemDetailPage() {
       placeholder: 'Enter subsystem description',
     },
     {
+      name: 'partnumber',
+      label: 'Part #',
+      type: 'text' as const,
+      required: false,
+      placeholder: 'Enter Part Number of SubSystem',
+    },
+    {
       name: 'status_id',
       label: 'Status',
       type: 'select' as const,
       required: true,
       options: statuses.map(s => ({ label: s.name, value: s.id })),
     },
+    
   ];
 
   async function handleAddSubsystem(formData: Record<string, any>) {
@@ -66,6 +74,10 @@ export default function SystemDetailPage() {
         description: formData.description || '',
         system_id: system.id,
         status_id: Number(formData.status_id),
+        part_number:formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Subsystem added successfully');

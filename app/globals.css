@@ -38,6 +38,15 @@
   --sidebar-border: oklch(0.28 0.04 250);
   --sidebar-ring: oklch(0.55 0.16 250);
 }
+.breadcrumb {
+  --s: 30px; /* control the shape */
+  
+  line-height: 1.8; /* control the height */
+  padding-inline: calc(var(--s) + .3em);
+  clip-path: polygon(0 0,calc(100% - var(--s)) 0,100% 50%,calc(100% - var(--s)) 100%,0 100%,var(--s) 50%);
+  background: rgb(0, 255, 200);
+  width: fit-content;
+}
 
 .dark {
   --background: oklch(0.14 0.02 250);
@@ -73,6 +82,7 @@
   --sidebar-border: oklch(0.28 0.03 250);
   --sidebar-ring: oklch(0.60 0.16 250);
 }
+
 
 @theme inline {
   --font-sans: 'Geist', 'Geist Fallback';

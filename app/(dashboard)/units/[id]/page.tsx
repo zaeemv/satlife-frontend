@@ -48,12 +48,19 @@ export default function UnitDetailPage() {
       placeholder: 'Enter component description',
     },
     {
-      name: 'sku',
-      label: 'SKU',
+      name: 'partnumber',
+      label: 'Part #',
       type: 'text' as const,
       required: false,
-      placeholder: 'Enter component SKU',
+      placeholder: 'Enter Part Number of Component',
     },
+    // {
+    //   name: 'sku',
+    //   label: 'SKU',
+    //   type: 'text' as const,
+    //   required: false,
+    //   placeholder: 'Enter component SKU',
+    // },
     {
       name: 'status_id',
       label: 'Status',
@@ -76,6 +83,10 @@ export default function UnitDetailPage() {
         sku: formData.sku || '',
         unit_id: unit.id,
         status_id: Number(formData.status_id),
+        part_number:formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Component added successfully');
