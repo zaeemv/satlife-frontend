@@ -52,7 +52,9 @@ export default function SystemsPage() {
 
   const filtered = systems.filter((s) => {
     const matchesSearch = s.name.toLowerCase().includes(search.toLowerCase()) ||
-      s.description.toLowerCase().includes(search.toLowerCase());
+      s.description.toLowerCase().includes(search.toLowerCase()) ||
+      s.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+      s.part_number?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || s.status?.name === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -192,7 +194,7 @@ export default function SystemsPage() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search systems..."
+            placeholder="Search by name, serial number, or part number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"

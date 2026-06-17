@@ -11,6 +11,7 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState,useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
@@ -22,14 +23,49 @@ export default function SystemDetailPage() {
   const { systems, projects,loading, subsystems, createSubsystem, deleteSubsystem } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
-  const system = systems.find((s) => String(s.id) === systemId);
-  const project = system ? projects.find((p) => p.id === system.project_id) : null;
-  const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  
+  const system = systems.find((s) => String(s.id) === systemId);
+  const project = system ? projects.find((p) => p.id === system.project_id) : null;
+  const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
+
+  // Fetch statuses and hierarchy on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusRes, systemHierarchyRes] = await Promise.all([
+          api.statuses.list("subsystems"),
+          api.hierarchies.list("system"),
+        ]);
+
+        setStatuses(statusRes.data);
+        setSystemHierarchyNames(systemHierarchyRes.data);
+
+        if (system) {
+          const parentHierarchyId = systemHierarchyRes.data.find(
+            (hierarchy) => hierarchy.name === system.name
+          )?.id;
+
+          if (parentHierarchyId) {
+            const childRes = await api.hierarchies.list("subsystem", parentHierarchyId);
+            setSubsystemHierarchyNames(childRes.data);
+          } else {
+            setSubsystemHierarchyNames([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch statuses or hierarchy names", err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, [system]);
+
   const subsystemFormFields = [
     {
       name: 'name',
@@ -109,38 +145,7 @@ export default function SystemDetailPage() {
       </div>
     );
   }
-  useEffect(() => {
-      const fetchData = async () => {
-        try {
-          const [statusRes, systemHierarchyRes] = await Promise.all([
-            api.statuses.list("subsystems"),
-            api.hierarchies.list("system"),
-          ]);
 
-          setStatuses(statusRes.data);
-          setSystemHierarchyNames(systemHierarchyRes.data);
-
-          if (system) {
-            const parentHierarchyId = systemHierarchyRes.data.find(
-              (hierarchy) => hierarchy.name === system.name
-            )?.id;
-
-            if (parentHierarchyId) {
-              const childRes = await api.hierarchies.list("subsystem", parentHierarchyId);
-              setSubsystemHierarchyNames(childRes.data);
-            } else {
-              setSubsystemHierarchyNames([]);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to fetch statuses or hierarchy names", err);
-        } finally {
-          setLoadingStatuses(false);
-        }
-      };
-
-      fetchData();
-    }, [system]);
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
@@ -219,6 +224,9 @@ export default function SystemDetailPage() {
         addButtonLabel="Add Subsystem"
         emptyMessage="No subsystems yet. Click 'Add Subsystem' to create one."
       />
+
+      {/* Inventory Items */}
+      <EntityInventorySearch entityType="system" entityName={system.name} />
 
       {/* Add Subsystem Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

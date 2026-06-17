@@ -152,11 +152,21 @@ export interface Hierarchy {
 // Inventory
 export interface Inventory {
   id: number
-  component_id: number
+  entity_id: number
+  name: string
+  inventory_type: string // 'system' | 'subsystem' | 'module' | 'unit' | 'component'
+  serial_number?: string
   quantity: number
+  description?: string
+  oem_name?: string
+  manufacturer_part_number?: string
   location: string
   created_at: string
   component?: Component
+  system?: System
+  subsystem?: Subsystem
+  module?: Module
+  unit?: Unit
 }
 
 // Entity (generic resource tracker)

@@ -86,7 +86,9 @@ export default function ComponentsPage() {
 
   const filtered = components.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.description?.toLowerCase().includes(search.toLowerCase());
+      c.description?.toLowerCase().includes(search.toLowerCase()) ||
+      c.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+      c.part_number?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || c.status?.name === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -224,7 +226,7 @@ export default function ComponentsPage() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search components..."
+            placeholder="Search by name, serial number, or part number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"

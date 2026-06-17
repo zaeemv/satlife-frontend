@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -12,95 +11,262 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { Hierarchy } from '@/lib/models';
+import type { Inventory, System, Subsystem, Module, Unit, Component } from '@/lib/models';
+
+type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
+
+interface InventoryItem extends Inventory {
+  entityName?: string;
+  serialNumber?: string;
+  partNumber?: string;
+}
 
 export default function InventoryPage() {
-  const { inventory, components, loading, createInventoryItem, updateInventoryItem, deleteInventoryItem } = useDataStore();
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [entityTypeFilter, setEntityTypeFilter] = useState<EntityType | 'all'>('all');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Hierarchy[]>([]);
-  const [selectedComponentId, setSelectedComponentId] = useState<string>('');
+  
+  const [entityTypes, setEntityTypes] = useState<{ [key: string]: any[] }>({
+    system: [],
+    subsystem: [],
+    module: [],
+    unit: [],
+    component: [],
+  });
+  const [entitiesLoaded, setEntitiesLoaded] = useState(false);
+
+  const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
   const [formData, setFormData] = useState({
-    component_id: 0,
+    name: '',
+    inventory_type: 'component',
+    serial_number: '',
     quantity: 0,
+    description: '',
+    oem_name: '',
+    manufacturer_part_number: '',
     location: '',
   });
 
-  // Fetch component hierarchy
+  // Fetch all entity types
   useEffect(() => {
-    const fetchComponentHierarchy = async () => {
+    const fetchAllEntities = async () => {
       try {
-        const res = await api.hierarchies.list('component');
-        console.log('Fetched component hierarchy:', res.data);
-        setComponentHierarchyNames(res.data);
+        console.log('Starting to fetch entities...');
+        const [systems, subsystems, modules, units, components] = await Promise.all([
+          api.systems.list(0, 1000),
+          api.subsystems.list(0, 1000),
+          api.modules.list(0, 1000),
+          api.units.list(0, 1000),
+          api.components.list(0, 1000),
+        ]);
+
+        console.log('Fetched entities:', {
+          systems: systems.data.length,
+          subsystems: subsystems.data.length,
+          modules: modules.data.length,
+          units: units.data.length,
+          components: components.data.length,
+        });
+
+        setEntityTypes({
+          system: systems.data,
+          subsystem: subsystems.data,
+          module: modules.data,
+          unit: units.data,
+          component: components.data,
+        });
+        setEntitiesLoaded(true);
       } catch (err) {
-        console.error('Failed to fetch component hierarchy', err);
+        console.error('Failed to fetch entities:', err);
+        toast.error('Failed to load entities');
+        setLoading(false);
       }
     };
-    fetchComponentHierarchy();
+
+    fetchAllEntities();
   }, []);
 
-  const filtered = inventory.filter((item) =>
-    components.find((c) => c.id === item.component_id)?.name.toLowerCase().includes(search.toLowerCase())
-  );
-
-  async function handleCreate() {
-    console.log('Form data:', formData, 'Selected component ID:', selectedComponentId);
-    const quantity = Number(formData.quantity);
-    if (!formData.component_id || !selectedComponentId.trim() || isNaN(quantity) || quantity <= 0 || !formData.location.trim()) {
-      toast.error('Please fill in all required fields with valid values');
+  // Fetch inventory items after entities are loaded
+  useEffect(() => {
+    if (!entitiesLoaded) {
+      console.log('Waiting for entities to load...');
       return;
     }
+
+    const fetchInventory = async () => {
+      try {
+        console.log('Fetching inventory...');
+        const res = await api.inventory.list(0, 1000);
+        console.log('Fetched inventory:', res.data.length, 'items');
+        
+        // Enrich inventory items (keeping for backwards compatibility if needed)
+        const enrichedItems: InventoryItem[] = res.data.map((item) => {
+          return {
+            ...item,
+            entityName: item.name, // Use inventory item name, not entity name
+            serialNumber: item.serial_number || '',
+            partNumber: item.manufacturer_part_number || '',
+          };
+        });
+
+        console.log('Enriched inventory items:', enrichedItems.length);
+        setInventory(enrichedItems);
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch inventory:', err);
+        toast.error('Failed to load inventory');
+        setLoading(false);
+      }
+    };
+
+    fetchInventory();
+  }, [entitiesLoaded, entityTypes]);
+
+  const filtered = inventory.filter((item) => {
+    const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
+    const matchesSearch =
+      search === '' ||
+      item.entityName?.toLowerCase().includes(search.toLowerCase()) ||
+      item.serialNumber?.toLowerCase().includes(search.toLowerCase()) ||
+      item.partNumber?.toLowerCase().includes(search.toLowerCase());
+    return matchesType && matchesSearch;
+  });
+
+  async function handleCreate() {
+    if (!formData.name.trim() || formData.quantity <= 0 || !formData.location.trim()) {
+      toast.error('Please fill in required fields: Name, Quantity (>0), and Location');
+      return;
+    }
+
     try {
-      await createInventoryItem(formData);
-      setFormData({ component_id: 0, quantity: 0, location: '' });
-      setSelectedComponentId('');
+      const payload = {
+        name: formData.name,
+        inventory_type: selectedEntityType,
+        serial_number: formData.serial_number,
+        quantity: formData.quantity,
+        description: formData.description,
+        oem_name: formData.oem_name,
+        manufacturer_part_number: formData.manufacturer_part_number,
+        location: formData.location,
+      };
+
+      await api.inventory.create(payload);
+      toast.success('Inventory item created');
+      
+      // Refresh inventory
+      const res = await api.inventory.list(0, 1000);
+      const enrichedItems: InventoryItem[] = res.data.map((item) => {
+        return {
+          ...item,
+          entityName: item.name,
+          serialNumber: item.serial_number || '',
+          partNumber: item.manufacturer_part_number || '',
+        };
+      });
+      setInventory(enrichedItems);
+      
+      setFormData({ name: '', inventory_type: 'component', serial_number: '', quantity: 0, description: '', oem_name: '', manufacturer_part_number: '', location: '' });
+      setSelectedEntityType('component');
       setIsCreateOpen(false);
-    } catch {
-      // Error handled by DataStore
+    } catch (err) {
+      console.error('Failed to create inventory item:', err);
+      toast.error('Failed to create inventory item');
     }
   }
 
   async function handleUpdate() {
     if (!editingId) return;
-    const quantity = Number(formData.quantity);
-    if (!formData.component_id || !selectedComponentId.trim() || isNaN(quantity) || quantity <= 0 || !formData.location.trim()) {
-      toast.error('Please fill in all required fields with valid values');
+    if (!formData.name.trim() || formData.quantity <= 0 || !formData.location.trim()) {
+      toast.error('Please fill in required fields: Name, Quantity (>0), and Location');
       return;
     }
+
     try {
-      await updateInventoryItem(editingId, formData);
-      setFormData({ component_id: 0, quantity: 0, location: '' });
-      setSelectedComponentId('');
+      const payload = {
+        name: formData.name,
+        inventory_type: selectedEntityType,
+        serial_number: formData.serial_number,
+        quantity: formData.quantity,
+        description: formData.description,
+        oem_name: formData.oem_name,
+        manufacturer_part_number: formData.manufacturer_part_number,
+        location: formData.location,
+      };
+
+      await api.inventory.update(editingId, payload);
+      toast.success('Inventory item updated');
+
+      // Refresh inventory
+      const res = await api.inventory.list(0, 1000);
+      const enrichedItems: InventoryItem[] = res.data.map((item) => {
+        let entityName = '';
+        let serialNumber = '';
+        let partNumber = '';
+
+        const entities = entityTypes[item.inventory_type as EntityType] || [];
+        const entity = entities.find((e) => e.id === item.entity_id);
+
+        if (entity) {
+          entityName = entity.name;
+          serialNumber = entity.serial_number || '';
+          partNumber = entity.part_number || '';
+        }
+
+        return {
+          ...item,
+          entityName,
+          serialNumber,
+          partNumber,
+        };
+      });
+      setInventory(enrichedItems);
+
+      setFormData({ name: '', inventory_type: 'component', serial_number: '', quantity: 0, description: '', oem_name: '', manufacturer_part_number: '', location: '' });
+      setSelectedEntityType('component');
       setEditingId(null);
       setIsEditOpen(false);
-    } catch {
-      // Error handled by DataStore
+    } catch (err) {
+      console.error('Failed to update inventory item:', err);
+      toast.error('Failed to update inventory item');
     }
   }
 
   async function handleDelete(id: number) {
     if (!confirm('Are you sure you want to delete this inventory item?')) return;
+
     try {
-      await deleteInventoryItem(id);
-    } catch {
-      // Error handled by DataStore
+      await api.inventory.delete(id);
+      toast.success('Inventory item deleted');
+      setInventory(inventory.filter((item) => item.id !== id));
+    } catch (err) {
+      console.error('Failed to delete inventory item:', err);
+      toast.error('Failed to delete inventory item');
     }
   }
 
-  function openEdit(item: typeof inventory[0]) {
+  function openEdit(item: InventoryItem) {
     setEditingId(item.id);
-    const hierarchyItem = componentHierarchyNames.find((h) => h.id === item.component_id);
-    setSelectedComponentId(hierarchyItem?.id.toString() || '');
+    setSelectedEntityType(item.inventory_type as EntityType);
     setFormData({
-      component_id: item.component_id,
+      name: item.name || '',
+      inventory_type: item.inventory_type,
+      serial_number: item.serial_number || '',
       quantity: item.quantity,
+      description: item.description || '',
+      oem_name: item.oem_name || '',
+      manufacturer_part_number: item.manufacturer_part_number || '',
       location: item.location,
     });
     setIsEditOpen(true);
   }
+
+  const getEntityDisplayName = (entityType: EntityType) => {
+    return entityType.charAt(0).toUpperCase() + entityType.slice(1);
+  };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
 
@@ -108,63 +274,114 @@ export default function InventoryPage() {
     <div className="space-y-8">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Inventory</h1>
-        <p className="text-muted-foreground mt-2">Track component inventory and stock levels</p>
+        <p className="text-muted-foreground mt-2">Manage inventory for all entity types</p>
       </div>
 
       <div className="flex gap-4 items-center">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by serial number or component..."
+            placeholder="Search by name, serial number, or part number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
           />
         </div>
+
+        <Select value={entityTypeFilter} onValueChange={(value) => setEntityTypeFilter(value as EntityType | 'all')}>
+          <SelectTrigger className="w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Types</SelectItem>
+            <SelectItem value="system">System</SelectItem>
+            <SelectItem value="subsystem">Subsystem</SelectItem>
+            <SelectItem value="module">Module</SelectItem>
+            <SelectItem value="unit">Unit</SelectItem>
+            <SelectItem value="component">Component</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
               Add Item
             </Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Add Inventory Item</DialogTitle>
-              <DialogDescription>Register a new component in inventory</DialogDescription>
+              <DialogDescription>Add a new inventory item for any entity type</DialogDescription>
             </DialogHeader>
             <div className="space-y-4">
               <div>
-                <Label>Component *</Label>
+                <Label>Inventory Type *</Label>
                 <Select
-                  value={selectedComponentId}
-                  onValueChange={(hierarchyId) => {
-                    console.log('Selected hierarchy ID:', hierarchyId);
-                    const hierarchy = componentHierarchyNames.find((h) => h.id === Number(hierarchyId));
-                    console.log('Found hierarchy:', hierarchy);
-                    if (hierarchy) {
-                      setSelectedComponentId(hierarchyId);
-                      // Use hierarchy.id as component_id
-                      setFormData({ ...formData, component_id: hierarchy.id });
-                    }
+                  value={selectedEntityType}
+                  onValueChange={(value) => {
+                    setSelectedEntityType(value as EntityType);
+                    setFormData({ ...formData, inventory_type: value });
                   }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select component" />
+                    <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {componentHierarchyNames.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No components available</div>
-                    ) : (
-                      componentHierarchyNames.map((hierarchy) => (
-                        <SelectItem key={hierarchy.id} value={hierarchy.id.toString()}>
-                          {hierarchy.name}
-                        </SelectItem>
-                      ))
-                    )}
+                    <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="subsystem">Subsystem</SelectItem>
+                    <SelectItem value="module">Module</SelectItem>
+                    <SelectItem value="unit">Unit</SelectItem>
+                    <SelectItem value="component">Component</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
+
+              <div>
+                <Label>Name *</Label>
+                <Input
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="Item name"
+                />
+              </div>
+
+              <div>
+                <Label>Serial Number</Label>
+                <Input
+                  value={formData.serial_number}
+                  onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                  placeholder="e.g., SN-2024-001"
+                />
+              </div>
+
+              <div>
+                <Label>Manufacturer Part Number</Label>
+                <Input
+                  value={formData.manufacturer_part_number}
+                  onChange={(e) => setFormData({ ...formData, manufacturer_part_number: e.target.value })}
+                  placeholder="e.g., MPN-12345"
+                />
+              </div>
+
+              <div>
+                <Label>OEM Name</Label>
+                <Input
+                  value={formData.oem_name}
+                  onChange={(e) => setFormData({ ...formData, oem_name: e.target.value })}
+                  placeholder="Original Equipment Manufacturer"
+                />
+              </div>
+
+              <div>
+                <Label>Description</Label>
+                <Input
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Item description"
+                />
+              </div>
+
               <div>
                 <Label>Quantity *</Label>
                 <Input
@@ -178,14 +395,16 @@ export default function InventoryPage() {
                   placeholder="Enter quantity"
                 />
               </div>
+
               <div>
                 <Label>Location *</Label>
                 <Input
                   value={formData.location}
                   onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  placeholder="Warehouse A, Shelf 3"
+                  placeholder="Warehouse location"
                 />
               </div>
+
               <div className="flex gap-2 justify-end pt-4">
                 <Button variant="outline" onClick={() => setIsCreateOpen(false)}>
                   Cancel
@@ -207,7 +426,10 @@ export default function InventoryPage() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Component</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Serial Number</TableHead>
+                  <TableHead>Part Number</TableHead>
                   <TableHead>Quantity</TableHead>
                   <TableHead>Location</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -216,39 +438,31 @@ export default function InventoryPage() {
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                       No inventory items found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map((item) => {
-                    const component = components.find((c) => c.id === item.component_id);
-                    return (
-                      <TableRow key={item.id}>
-                        <TableCell className="font-medium">{component?.name || 'N/A'}</TableCell>
-                        <TableCell>{item.quantity}</TableCell>
-                        <TableCell>{item.location}</TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex gap-2 justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => openEdit(item)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() => handleDelete(item.id)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  filtered.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell className="capitalize font-medium">{item.inventory_type}</TableCell>
+                      <TableCell>{item.entityName || 'N/A'}</TableCell>
+                      <TableCell>{item.serialNumber || '—'}</TableCell>
+                      <TableCell>{item.partNumber || '—'}</TableCell>
+                      <TableCell>{item.quantity}</TableCell>
+                      <TableCell>{item.location}</TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="outline" onClick={() => openEdit(item)}>
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDelete(item.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
                 )}
               </TableBody>
             </Table>
@@ -264,33 +478,55 @@ export default function InventoryPage() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Component</Label>
-              <Select
-                value={selectedComponentId}
-                onValueChange={(hierarchyId) => {
-                  const hierarchy = componentHierarchyNames.find((h) => h.id === Number(hierarchyId));
-                  if (hierarchy) {
-                    setSelectedComponentId(hierarchyId);
-                    setFormData({ ...formData, component_id: hierarchy.id });
-                  }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select component" />
-                </SelectTrigger>
-                <SelectContent>
-                  {componentHierarchyNames.length === 0 ? (
-                    <div className="p-2 text-sm text-muted-foreground">No components available</div>
-                  ) : (
-                    componentHierarchyNames.map((hierarchy) => (
-                      <SelectItem key={hierarchy.id} value={hierarchy.id.toString()}>
-                        {hierarchy.name}
-                      </SelectItem>
-                    ))
-                  )}
-                </SelectContent>
-              </Select>
+              <Label>Inventory Type</Label>
+              <Input value={getEntityDisplayName(selectedEntityType)} disabled />
             </div>
+
+            <div>
+              <Label>Name</Label>
+              <Input
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Item name"
+              />
+            </div>
+
+            <div>
+              <Label>Serial Number</Label>
+              <Input
+                value={formData.serial_number}
+                onChange={(e) => setFormData({ ...formData, serial_number: e.target.value })}
+                placeholder="e.g., SN-2024-001"
+              />
+            </div>
+
+            <div>
+              <Label>Manufacturer Part Number</Label>
+              <Input
+                value={formData.manufacturer_part_number}
+                onChange={(e) => setFormData({ ...formData, manufacturer_part_number: e.target.value })}
+                placeholder="e.g., MPN-12345"
+              />
+            </div>
+
+            <div>
+              <Label>OEM Name</Label>
+              <Input
+                value={formData.oem_name}
+                onChange={(e) => setFormData({ ...formData, oem_name: e.target.value })}
+                placeholder="Original Equipment Manufacturer"
+              />
+            </div>
+
+            <div>
+              <Label>Description</Label>
+              <Input
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                placeholder="Item description"
+              />
+            </div>
+
             <div>
               <Label>Quantity</Label>
               <Input
@@ -303,6 +539,7 @@ export default function InventoryPage() {
                 }}
               />
             </div>
+
             <div>
               <Label>Location</Label>
               <Input
@@ -310,6 +547,7 @@ export default function InventoryPage() {
                 onChange={(e) => setFormData({ ...formData, location: e.target.value })}
               />
             </div>
+
             <div className="flex gap-2 justify-end pt-4">
               <Button variant="outline" onClick={() => setIsEditOpen(false)}>
                 Cancel

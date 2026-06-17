@@ -86,7 +86,9 @@ export default function UnitsPage() {
 
   const filtered = units.filter((u) => {
     const matchesSearch = u.name.toLowerCase().includes(search.toLowerCase()) ||
-      u.description?.toLowerCase().includes(search.toLowerCase());
+      u.description?.toLowerCase().includes(search.toLowerCase()) ||
+      u.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+      u.part_number?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || u.status?.name === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -208,7 +210,7 @@ export default function UnitsPage() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search units..."
+            placeholder="Search by name, serial number, or part number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"

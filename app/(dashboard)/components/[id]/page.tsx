@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { ArrowLeft, Calendar, Layers, Code2 } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
 
 export default function ComponentDetailPage() {
   const params = useParams();
@@ -160,6 +161,9 @@ export default function ComponentDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Inventory Items */}
+      <EntityInventorySearch entityType="component" entityName={component.name} />
     </div>
   );
 }

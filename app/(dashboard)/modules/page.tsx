@@ -87,7 +87,9 @@ export default function ModulesPage() {
 
   const filtered = modules.filter((m) => {
     const matchesSearch = m.name.toLowerCase().includes(search.toLowerCase()) ||
-      m.description?.toLowerCase().includes(search.toLowerCase());
+      m.description?.toLowerCase().includes(search.toLowerCase()) ||
+      m.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+      m.part_number?.toLowerCase().includes(search.toLowerCase());
     const matchesStatus = statusFilter === 'all' || m.status?.name === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -225,7 +227,7 @@ export default function ModulesPage() {
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search modules..."
+            placeholder="Search by name, serial number, or part number..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"

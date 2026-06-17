@@ -134,6 +134,10 @@ export const hierarchies = {
 // Inventory
 export const inventory = {
   list: (skip = 0, limit = 100) => api.get<Models.Inventory[]>("/inventory/", { params: { skip, limit } }),
+  listByType: (inventory_type: string, skip = 0, limit = 100) => 
+    api.get<Models.Inventory[]>("/inventory/by-type/" + inventory_type + "/", { params: { skip, limit } }),
+  listByEntity: (entity_id: number) => 
+    api.get<Models.Inventory[]>("/inventory/by-entity/" + entity_id + "/"),
   get: (id: number) => api.get<Models.Inventory>(`/inventory/${id}/`),
   create: (data: Partial<Models.Inventory>) => api.post<Models.Inventory>("/inventory/", data),
   update: (id: number, data: Partial<Models.Inventory>) => api.put<Models.Inventory>(`/inventory/${id}/`, data),

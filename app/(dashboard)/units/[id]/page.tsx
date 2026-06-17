@@ -10,8 +10,7 @@ import { ArrowLeft, Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
-import { EntityForm } from '@/components/entity-form';
-import { useState, useEffect } from 'react';
+import { EntityForm } from '@/components/entity-form';import { EntityInventorySearch } from '@/components/entity-inventory-search';import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
@@ -22,15 +21,47 @@ export default function UnitDetailPage() {
   const { units, loading, modules, components, createComponent, deleteComponent } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
   
   const unit = units.find((u) => String(u.id) === unitId);
   const module = unit ? modules.find((m) => m.id === unit.module_id) : null;
   const unitComponents = unit ? components.filter((c) => c.unit_id === unit.id) : [];
 
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  // Fetch statuses and hierarchy on mount
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusRes, unitHierarchyRes] = await Promise.all([
+          api.statuses.list("components"),
+          api.hierarchies.list("unit"),
+        ]);
+        setStatuses(statusRes.data);
+        setUnitHierarchyNames(unitHierarchyRes.data);
+
+        if (unit) {
+          const parentHierarchyId = unitHierarchyRes.data.find(
+            (hierarchy) => hierarchy.name === unit.name
+          )?.id;
+
+          if (parentHierarchyId) {
+            const childRes = await api.hierarchies.list("component", parentHierarchyId);
+            setComponentHierarchyNames(childRes.data);
+          } else {
+            setComponentHierarchyNames([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch statuses or hierarchy names", err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, [unit]);
   
   const componentFormFields = [
     {
@@ -108,40 +139,6 @@ export default function UnitDetailPage() {
     }
   }
 
-   useEffect(() => {
-        const fetchData = async () => {
-          try {
-            const [statusRes, unitHierarchyRes] = await Promise.all([
-              api.statuses.list("components"),
-              api.hierarchies.list("unit"),
-            ]);
-            setStatuses(statusRes.data);
-            setUnitHierarchyNames(unitHierarchyRes.data);
-
-            if (unit) {
-              const parentHierarchyId = unitHierarchyRes.data.find(
-                (hierarchy) => hierarchy.name === unit.name
-              )?.id;
-
-              if (parentHierarchyId) {
-                const childRes = await api.hierarchies.list("component", parentHierarchyId);
-                setComponentHierarchyNames(childRes.data);
-              } else {
-                setComponentHierarchyNames([]);
-              }
-            }
-          } catch (err) {
-            console.error("Failed to fetch statuses or hierarchy names", err);
-          } finally {
-            setLoadingStatuses(false);
-          }
-        };
-  
-        fetchData();
-      }, [unit]);
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
-  
-
   if (!unit) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -152,6 +149,8 @@ export default function UnitDetailPage() {
       </div>
     );
   }
+
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -235,6 +234,9 @@ export default function UnitDetailPage() {
         addButtonLabel="Add Component"
         emptyMessage="No components yet. Click 'Add Component' to create one."
       />
+
+      {/* Inventory Items */}
+      <EntityInventorySearch entityType="unit" entityName={unit.name} />
 
       {/* Add Component Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
