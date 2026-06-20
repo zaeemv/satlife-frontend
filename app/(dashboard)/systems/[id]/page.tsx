@@ -16,6 +16,8 @@ import { useState,useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import type { Inventory } from '@/lib/models';
+import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
 
 export default function SystemDetailPage() {
   const params = useParams();
@@ -135,6 +137,26 @@ export default function SystemDetailPage() {
     }
   }
 
+  async function handleUseInventory(item: Inventory) {
+    if (!system) {
+      throw new Error('System not found');
+    }
+
+    const defaultStatus = statuses[0];
+    if (!defaultStatus) {
+      throw new Error('No subsystem status available');
+    }
+
+    await createSubsystem({
+      name: item.name,
+      description: item.description || '',
+      system_id: system.id,
+      status_id: defaultStatus.id,
+      part_number: item.manufacturer_part_number || '',
+      serial_number: nextSerialNumberFromInventory(item, systemSubsystems),
+    });
+  }
+
   if (!system) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -226,7 +248,12 @@ export default function SystemDetailPage() {
       />
 
       {/* Inventory Items */}
-      <EntityInventorySearch entityType="system" entityName={system.name} />
+      <EntityInventorySearch
+        parentEntityName={system.name}
+        inventoryType={getChildInventoryType('system')}
+        allowedInventoryNames={subsystemHierarchyNames.map((hierarchy) => hierarchy.name)}
+        onUseInventory={handleUseInventory}
+      />
 
       {/* Add Subsystem Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

@@ -10,10 +10,14 @@ import { ArrowLeft, Calendar, Layers } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
-import { EntityForm } from '@/components/entity-form';import { EntityInventorySearch } from '@/components/entity-inventory-search';import { useState, useEffect } from 'react';
+import { EntityForm } from '@/components/entity-form';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import type { Inventory } from '@/lib/models';
+import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
 
 export default function ModuleDetailPage() {
   const params = useParams();
@@ -131,6 +135,26 @@ export default function ModuleDetailPage() {
     }
   }
 
+  async function handleUseInventory(item: Inventory) {
+    if (!module) {
+      throw new Error('Module not found');
+    }
+
+    const defaultStatus = statuses[0];
+    if (!defaultStatus) {
+      throw new Error('No unit status available');
+    }
+
+    await createUnit({
+      name: item.name,
+      description: item.description || '',
+      module_id: module.id,
+      status_id: defaultStatus.id,
+      part_number: item.manufacturer_part_number || '',
+      serial_number: nextSerialNumberFromInventory(item, moduleUnits),
+    });
+  }
+
   if (!module) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -228,7 +252,12 @@ export default function ModuleDetailPage() {
       />
 
       {/* Inventory Items */}
-      <EntityInventorySearch entityType="module" entityName={module.name} />
+      <EntityInventorySearch
+        parentEntityName={module.name}
+        inventoryType={getChildInventoryType('module')}
+        allowedInventoryNames={unitHierarchyNames.map((hierarchy) => hierarchy.name)}
+        onUseInventory={handleUseInventory}
+      />
 
       {/* Add Unit Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

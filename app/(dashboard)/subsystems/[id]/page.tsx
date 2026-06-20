@@ -15,6 +15,8 @@ import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as Models from '@/lib/models';
+import type { Inventory } from '@/lib/models';
+import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
 import * as api from '@/lib/api';
 
 export default function SubsystemDetailPage() {
@@ -133,6 +135,26 @@ export default function SubsystemDetailPage() {
     }
   }
 
+  async function handleUseInventory(item: Inventory) {
+    if (!subsystem) {
+      throw new Error('Subsystem not found');
+    }
+
+    const defaultStatus = statuses[0];
+    if (!defaultStatus) {
+      throw new Error('No module status available');
+    }
+
+    await createModule({
+      name: item.name,
+      description: item.description || '',
+      subsystem_id: subsystem.id,
+      status_id: defaultStatus.id,
+      part_number: item.manufacturer_part_number || '',
+      serial_number: nextSerialNumberFromInventory(item, subsystemModules),
+    });
+  }
+
   if (!subsystem) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -230,7 +252,12 @@ export default function SubsystemDetailPage() {
       />
 
       {/* Inventory Items */}
-      <EntityInventorySearch entityType="subsystem" entityName={subsystem.name} />
+      <EntityInventorySearch
+        parentEntityName={subsystem.name}
+        inventoryType={getChildInventoryType('subsystem')}
+        allowedInventoryNames={moduleHierarchyNames.map((hierarchy) => hierarchy.name)}
+        onUseInventory={handleUseInventory}
+      />
 
       {/* Add Module Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>

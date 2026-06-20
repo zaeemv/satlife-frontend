@@ -13,10 +13,13 @@ import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCirc
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import type { Inventory } from '@/lib/models';
+import { nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
 
 export default function ProjectDetailPage() {
   const params = useParams();
@@ -117,6 +120,26 @@ export default function ProjectDetailPage() {
     } catch {
       toast.error('Failed to delete system');
     }
+  }
+
+  async function handleUseInventory(item: Inventory) {
+    if (!project) {
+      throw new Error('Project not found');
+    }
+
+    const defaultStatus = statuses[0];
+    if (!defaultStatus) {
+      throw new Error('No system status available');
+    }
+
+    await createSystem({
+      name: item.name,
+      description: item.description || '',
+      project_id: project.id,
+      status_id: defaultStatus.id,
+      part_number: item.manufacturer_part_number || '',
+      serial_number: nextSerialNumberFromInventory(item, projectSystems),
+    });
   }
 
   if (!project) {
@@ -236,6 +259,14 @@ export default function ProjectDetailPage() {
         detailPath={(id) => `/systems/${id}`}
         addButtonLabel="Add System"
         emptyMessage="No systems yet. Click 'Add System' to create one."
+      />
+
+      {/* Inventory Items */}
+      <EntityInventorySearch
+        parentEntityName={project.name}
+        inventoryType="system"
+        allowedInventoryNames={systemHierarchyNames.map((hierarchy) => hierarchy.name)}
+        onUseInventory={handleUseInventory}
       />
 
       {/* Add System Dialog */}

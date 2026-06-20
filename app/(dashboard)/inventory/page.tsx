@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Plus, Edit, Trash2, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
-import type { Inventory, System, Subsystem, Module, Unit, Component } from '@/lib/models';
+import type { Hierarchy, Inventory } from '@/lib/models';
 
 type EntityType = 'system' | 'subsystem' | 'module' | 'unit' | 'component';
 
@@ -19,6 +19,15 @@ interface InventoryItem extends Inventory {
   entityName?: string;
   serialNumber?: string;
   partNumber?: string;
+}
+
+function enrichInventoryItems(items: Inventory[]): InventoryItem[] {
+  return items.map((item) => ({
+    ...item,
+    entityName: item.name,
+    serialNumber: item.serial_number || '',
+    partNumber: item.manufacturer_part_number || '',
+  }));
 }
 
 export default function InventoryPage() {
@@ -29,17 +38,9 @@ export default function InventoryPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-  
-  const [entityTypes, setEntityTypes] = useState<{ [key: string]: any[] }>({
-    system: [],
-    subsystem: [],
-    module: [],
-    unit: [],
-    component: [],
-  });
-  const [entitiesLoaded, setEntitiesLoaded] = useState(false);
 
   const [selectedEntityType, setSelectedEntityType] = useState<EntityType>('component');
+  const [hierarchyCategories, setHierarchyCategories] = useState<Hierarchy[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     inventory_type: 'component',
@@ -51,69 +52,25 @@ export default function InventoryPage() {
     location: '',
   });
 
-  // Fetch all entity types
   useEffect(() => {
-    const fetchAllEntities = async () => {
+    const fetchHierarchyCategories = async () => {
       try {
-        console.log('Starting to fetch entities...');
-        const [systems, subsystems, modules, units, components] = await Promise.all([
-          api.systems.list(0, 1000),
-          api.subsystems.list(0, 1000),
-          api.modules.list(0, 1000),
-          api.units.list(0, 1000),
-          api.components.list(0, 1000),
-        ]);
-
-        console.log('Fetched entities:', {
-          systems: systems.data.length,
-          subsystems: subsystems.data.length,
-          modules: modules.data.length,
-          units: units.data.length,
-          components: components.data.length,
-        });
-
-        setEntityTypes({
-          system: systems.data,
-          subsystem: subsystems.data,
-          module: modules.data,
-          unit: units.data,
-          component: components.data,
-        });
-        setEntitiesLoaded(true);
+        const res = await api.hierarchies.list(selectedEntityType);
+        setHierarchyCategories(res.data);
       } catch (err) {
-        console.error('Failed to fetch entities:', err);
-        toast.error('Failed to load entities');
-        setLoading(false);
+        console.error('Failed to load hierarchy categories:', err);
+        setHierarchyCategories([]);
       }
     };
 
-    fetchAllEntities();
-  }, []);
+    fetchHierarchyCategories();
+  }, [selectedEntityType]);
 
-  // Fetch inventory items after entities are loaded
   useEffect(() => {
-    if (!entitiesLoaded) {
-      console.log('Waiting for entities to load...');
-      return;
-    }
-
     const fetchInventory = async () => {
       try {
-        console.log('Fetching inventory...');
         const res = await api.inventory.list(0, 1000);
-        console.log('Fetched inventory:', res.data.length, 'items');
-        
-        // Enrich inventory items (keeping for backwards compatibility if needed)
-        const enrichedItems: InventoryItem[] = res.data.map((item) => {
-          return {
-            ...item,
-            entityName: item.name, // Use inventory item name, not entity name
-            serialNumber: item.serial_number || '',
-            partNumber: item.manufacturer_part_number || '',
-          };
-        });
-
-        console.log('Enriched inventory items:', enrichedItems.length);
+        const enrichedItems = enrichInventoryItems(res.data);
         setInventory(enrichedItems);
         setLoading(false);
       } catch (err) {
@@ -124,7 +81,7 @@ export default function InventoryPage() {
     };
 
     fetchInventory();
-  }, [entitiesLoaded, entityTypes]);
+  }, []);
 
   const filtered = inventory.filter((item) => {
     const matchesType = entityTypeFilter === 'all' || item.inventory_type === entityTypeFilter;
@@ -138,7 +95,7 @@ export default function InventoryPage() {
 
   async function handleCreate() {
     if (!formData.name.trim() || formData.quantity <= 0 || !formData.location.trim()) {
-      toast.error('Please fill in required fields: Name, Quantity (>0), and Location');
+      toast.error(`Please fill in required fields: ${getEntityDisplayName(selectedEntityType)} category, Quantity (>0), and Location`);
       return;
     }
 
@@ -159,15 +116,7 @@ export default function InventoryPage() {
       
       // Refresh inventory
       const res = await api.inventory.list(0, 1000);
-      const enrichedItems: InventoryItem[] = res.data.map((item) => {
-        return {
-          ...item,
-          entityName: item.name,
-          serialNumber: item.serial_number || '',
-          partNumber: item.manufacturer_part_number || '',
-        };
-      });
-      setInventory(enrichedItems);
+      setInventory(enrichInventoryItems(res.data));
       
       setFormData({ name: '', inventory_type: 'component', serial_number: '', quantity: 0, description: '', oem_name: '', manufacturer_part_number: '', location: '' });
       setSelectedEntityType('component');
@@ -200,30 +149,22 @@ export default function InventoryPage() {
       await api.inventory.update(editingId, payload);
       toast.success('Inventory item updated');
 
-      // Refresh inventory
-      const res = await api.inventory.list(0, 1000);
-      const enrichedItems: InventoryItem[] = res.data.map((item) => {
-        let entityName = '';
-        let serialNumber = '';
-        let partNumber = '';
+      const updatedItem: InventoryItem = {
+        ...(inventory.find((item) => item.id === editingId) as InventoryItem),
+        ...payload,
+        entityName: payload.name,
+        serialNumber: payload.serial_number || '',
+        partNumber: payload.manufacturer_part_number || '',
+      };
 
-        const entities = entityTypes[item.inventory_type as EntityType] || [];
-        const entity = entities.find((e) => e.id === item.entity_id);
+      setInventory((prev) => prev.map((item) => (item.id === editingId ? updatedItem : item)));
 
-        if (entity) {
-          entityName = entity.name;
-          serialNumber = entity.serial_number || '';
-          partNumber = entity.part_number || '';
-        }
-
-        return {
-          ...item,
-          entityName,
-          serialNumber,
-          partNumber,
-        };
-      });
-      setInventory(enrichedItems);
+      try {
+        const res = await api.inventory.list(0, 1000);
+        setInventory(enrichInventoryItems(res.data));
+      } catch (refreshErr) {
+        console.error('Failed to refresh inventory after update:', refreshErr);
+      }
 
       setFormData({ name: '', inventory_type: 'component', serial_number: '', quantity: 0, description: '', oem_name: '', manufacturer_part_number: '', location: '' });
       setSelectedEntityType('component');
@@ -321,7 +262,7 @@ export default function InventoryPage() {
                   value={selectedEntityType}
                   onValueChange={(value) => {
                     setSelectedEntityType(value as EntityType);
-                    setFormData({ ...formData, inventory_type: value });
+                    setFormData({ ...formData, inventory_type: value, name: '' });
                   }}
                 >
                   <SelectTrigger>
@@ -338,12 +279,28 @@ export default function InventoryPage() {
               </div>
 
               <div>
-                <Label>Name *</Label>
-                <Input
+                <Label>{getEntityDisplayName(selectedEntityType)} Category *</Label>
+                <Select
                   value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="Item name"
-                />
+                  onValueChange={(value) => setFormData({ ...formData, name: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={`Select ${selectedEntityType} from hierarchy`} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {hierarchyCategories.length === 0 ? (
+                      <SelectItem value="__none__" disabled>
+                        No categories defined in hierarchy
+                      </SelectItem>
+                    ) : (
+                      hierarchyCategories.map((hierarchy) => (
+                        <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                          {hierarchy.name}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -427,7 +384,7 @@ export default function InventoryPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Type</TableHead>
-                  <TableHead>Name</TableHead>
+                  <TableHead>Category</TableHead>
                   <TableHead>Serial Number</TableHead>
                   <TableHead>Part Number</TableHead>
                   <TableHead>Quantity</TableHead>
@@ -483,12 +440,28 @@ export default function InventoryPage() {
             </div>
 
             <div>
-              <Label>Name</Label>
-              <Input
+              <Label>{getEntityDisplayName(selectedEntityType)} Category</Label>
+              <Select
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="Item name"
-              />
+                onValueChange={(value) => setFormData({ ...formData, name: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={`Select ${selectedEntityType} from hierarchy`} />
+                </SelectTrigger>
+                <SelectContent>
+                  {hierarchyCategories.length === 0 ? (
+                    <SelectItem value="__none__" disabled>
+                      No categories defined in hierarchy
+                    </SelectItem>
+                  ) : (
+                    hierarchyCategories.map((hierarchy) => (
+                      <SelectItem key={hierarchy.id} value={hierarchy.name}>
+                        {hierarchy.name}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
