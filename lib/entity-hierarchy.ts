@@ -18,7 +18,8 @@ export function getChildInventoryType(
   return CHILD_INVENTORY_TYPE[parentType];
 }
 
-export function getInventoryTypeLabel(type: HierarchyEntityType): string {
+export function getInventoryTypeLabel(type: HierarchyEntityType | undefined): string {
+  if (!type) return 'Item';
   return type.charAt(0).toUpperCase() + type.slice(1);
 }
 

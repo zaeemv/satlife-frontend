@@ -247,8 +247,6 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
-      <EntityInventorySearch entityType="system" entityName={"Projecta"} />
-
       {/* Systems Cards */}
       <EntityCards
         title="Systems"
