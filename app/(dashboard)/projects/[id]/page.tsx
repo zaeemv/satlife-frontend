@@ -18,18 +18,17 @@ import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
-import type { Inventory } from '@/lib/models';
-import { nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
+  
   const { projects, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
-  
+
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -55,7 +54,7 @@ export default function ProjectDetailPage() {
       required: false,
       placeholder: 'Enter system description',
     },
-    {  
+    {
       name: 'partnumber',
       label: 'Part #',
       type: 'text' as const,
@@ -84,10 +83,10 @@ export default function ProjectDetailPage() {
       toast.error('Project not found');
       return;
     }
-    if (!formData.name.trim() || !formData.description  || !formData.status_id) {
-          toast.error('Please fill in all required fields');
-          return;
-        }
+    if (!formData.name.trim() || !formData.description || !formData.status_id) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
     setIsSubmitting(true);
     try {
       console.log("my project ID is ", project.id)
@@ -96,10 +95,10 @@ export default function ProjectDetailPage() {
         description: formData.description || '',
         project_id: formData.project_id ? Number(formData.project_id) : project.id,
         status_id: Number(formData.status_id),
-        part_number:formData.partnumber,
+        part_number: formData.partnumber,
         serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || ""
+          ? `${formData.name}-${formData.partnumber}`
+          : formData.name || formData.partnumber || ""
 
       });
       setIsAddOpen(false);
@@ -154,24 +153,24 @@ export default function ProjectDetailPage() {
   }
 
   useEffect(() => {
-        const fetchData = async () => {
-          try {
-            const [statusRes, hierarchyRes] = await Promise.all([
-              api.statuses.list("systems"),
-              api.hierarchies.list("system"),
-            ]);
-            setStatuses(statusRes.data);
-            setSystemHierarchyNames(hierarchyRes.data);
-          } catch (err) {
-            console.error("Failed to fetch statuses or hierarchy names", err);
-          } finally {
-            setLoadingStatuses(false);
-          }
-        };
-  
-        fetchData();
-      }, []);
-    if (loading) return <div className="p-8 text-center">Loading...</div>;
+    const fetchData = async () => {
+      try {
+        const [statusRes, hierarchyRes] = await Promise.all([
+          api.statuses.list("systems"),
+          api.hierarchies.list("system"),
+        ]);
+        setStatuses(statusRes.data);
+        setSystemHierarchyNames(hierarchyRes.data);
+      } catch (err) {
+        console.error("Failed to fetch statuses or hierarchy names", err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -248,6 +247,7 @@ export default function ProjectDetailPage() {
           </CardContent>
         </Card>
       </div>
+      <EntityInventorySearch entityType="system" entityName={"Projecta"} />
 
       {/* Systems Cards */}
       <EntityCards
