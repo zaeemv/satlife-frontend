@@ -6,6 +6,7 @@ import * as api from './api';
 // import * as maintenanceApi from '@/lib/maintenance';
 import * as Models from './models';
 import * as MaintenanceTypes from '@/lib/models';
+import { enrichEntitiesWithStatus, enrichEntityWithStatus } from '@/lib/entity-status';
 import { toast } from 'sonner';
 
 interface DataStoreContextType {
@@ -164,20 +165,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
 
   const refreshData = async () => {
-    const setResult = <T,>(
-      result: PromiseSettledResult<AxiosResponse<T>>,
-      setter: React.Dispatch<React.SetStateAction<T>>,
-      name: string
-    ) => {
-      if (result.status === 'fulfilled') {
-        setter(result.value.data);
-      } else {
-        console.warn(`Failed to refresh ${name}:`, result.reason);
-      }
-    };
-
     try {
-      // console.log('Refreshing data...');
       setLoading(true);
 
       const [
@@ -216,22 +204,69 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         api.maintenanceDeliveries.list(0, 100),
       ]);
 
-      setResult(usersRes, setUsers, 'users');
-      setResult(customersRes, setCustomers, 'customers');
-      setResult(ordersRes, setOrders, 'orders');
-      setResult(projectsRes, setProjects, 'projects');
-      setResult(systemsRes, setSystems, 'systems');
-      setResult(subsystemsRes, setSubsystems, 'subsystems');
-      setResult(modulesRes, setModules, 'modules');
-      setResult(unitsRes, setUnits, 'units');
-      setResult(componentsRes, setComponents, 'components');
-      setResult(inventoryRes, setInventory, 'inventory');
-      setResult(statusesRes, setStatuses, 'statuses');
-      setResult(maintenanceLogsRes, setMaintenanceLogs, 'maintenanceLogs');
-      setResult(maintenanceCasesRes, setMaintenanceCases, 'maintenanceCases');
-      setResult(faultyEntitiesRes, setFaultyEntities, 'faultyEntities');
-      setResult(maintenanceActionsRes, setMaintenanceActions, 'maintenanceActions');
-      setResult(maintenanceDeliveriesRes, setMaintenanceDeliveries, 'maintenanceDeliveries');
+      const getData = <T,>(
+        result: PromiseSettledResult<AxiosResponse<T>>,
+        fallback: T
+      ): T => (result.status === 'fulfilled' ? result.value.data : fallback);
+
+      const statusesData = getData(statusesRes, [] as Models.Status[]);
+      setStatuses(statusesData);
+
+      if (usersRes.status === 'fulfilled') {
+        setUsers(usersRes.value.data);
+      } else {
+        console.warn('Failed to refresh users:', usersRes.reason);
+      }
+
+      if (customersRes.status === 'fulfilled') {
+        setCustomers(customersRes.value.data);
+      } else {
+        console.warn('Failed to refresh customers:', customersRes.reason);
+      }
+
+      setOrders(enrichEntitiesWithStatus(getData(ordersRes, [] as Models.Order[]), statusesData));
+      setProjects(enrichEntitiesWithStatus(getData(projectsRes, [] as Models.Project[]), statusesData));
+      setSystems(enrichEntitiesWithStatus(getData(systemsRes, [] as Models.System[]), statusesData));
+      setSubsystems(enrichEntitiesWithStatus(getData(subsystemsRes, [] as Models.Subsystem[]), statusesData));
+      setModules(enrichEntitiesWithStatus(getData(modulesRes, [] as Models.Module[]), statusesData));
+      setUnits(enrichEntitiesWithStatus(getData(unitsRes, [] as Models.Unit[]), statusesData));
+      setComponents(enrichEntitiesWithStatus(getData(componentsRes, [] as Models.Component[]), statusesData));
+
+      if (inventoryRes.status === 'fulfilled') {
+        setInventory(inventoryRes.value.data);
+      } else {
+        console.warn('Failed to refresh inventory:', inventoryRes.reason);
+      }
+
+      if (maintenanceLogsRes.status === 'fulfilled') {
+        setMaintenanceLogs(maintenanceLogsRes.value.data);
+      } else {
+        console.warn('Failed to refresh maintenanceLogs:', maintenanceLogsRes.reason);
+      }
+
+      if (maintenanceCasesRes.status === 'fulfilled') {
+        setMaintenanceCases(maintenanceCasesRes.value.data);
+      } else {
+        console.warn('Failed to refresh maintenanceCases:', maintenanceCasesRes.reason);
+      }
+
+      if (faultyEntitiesRes.status === 'fulfilled') {
+        setFaultyEntities(faultyEntitiesRes.value.data);
+      } else {
+        console.warn('Failed to refresh faultyEntities:', faultyEntitiesRes.reason);
+      }
+
+      if (maintenanceActionsRes.status === 'fulfilled') {
+        setMaintenanceActions(maintenanceActionsRes.value.data);
+      } else {
+        console.warn('Failed to refresh maintenanceActions:', maintenanceActionsRes.reason);
+      }
+
+      if (maintenanceDeliveriesRes.status === 'fulfilled') {
+        setMaintenanceDeliveries(maintenanceDeliveriesRes.value.data);
+      } else {
+        console.warn('Failed to refresh maintenanceDeliveries:', maintenanceDeliveriesRes.reason);
+      }
 
       setError(null);
     } catch (err) {
@@ -358,7 +393,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createOrder = async (data: Partial<Models.Order>) => {
     try {
       const res = await api.orders.create(data);
-      setOrders([...orders, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setOrders([...orders, enriched]);
       toast.success('Order created successfully');
       return res.data;
     } catch (err) {
@@ -370,7 +406,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateOrder = async (id: number, data: Partial<Models.Order>) => {
     try {
       const res = await api.orders.update(id, data);
-      setOrders(orders.map((o) => (o.id === id ? res.data : o)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setOrders(orders.map((o) => (o.id === id ? enriched : o)));
       toast.success('Order updated successfully');
       return res.data;
     } catch (err) {
@@ -403,12 +440,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
   const createProject = async (data: Partial<Models.Project>) => {
     try {
-      // console.log("Created project:");
       const res = await api.projects.create(data);
-      // console.log("Created project:", res.data);
-      setProjects([...projects, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setProjects([...projects, enriched]);
       toast.success('Project created successfully');
-      return res.data;
+      return enriched;
     } catch (err) {
       toast.error('Failed to create project');
       throw err;
@@ -418,9 +454,10 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateProject = async (id: number, data: Partial<Models.Project>) => {
     try {
       const res = await api.projects.update(id, data);
-      setProjects(projects.map((p) => (p.id === id ? res.data : p)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setProjects(projects.map((p) => (p.id === id ? enriched : p)));
       toast.success('Project updated successfully');
-      return res.data;
+      return enriched;
     } catch (err) {
       toast.error('Failed to update project');
       throw err;
@@ -462,7 +499,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createSystem = async (data: Partial<Models.System>) => {
     try {
       const res = await api.systems.create(data);
-      setSystems([...systems, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setSystems([...systems, enriched]);
       toast.success('System created successfully');
       return res.data;
     } catch (err) {
@@ -474,7 +512,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateSystem = async (id: number, data: Partial<Models.System>) => {
     try {
       const res = await api.systems.update(id, data);
-      setSystems(systems.map((s) => (s.id === id ? res.data : s)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setSystems(systems.map((s) => (s.id === id ? enriched : s)));
       toast.success('System updated successfully');
       return res.data;
     } catch (err) {
@@ -518,7 +557,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createSubsystem = async (data: Partial<Models.Subsystem>) => {
     try {
       const res = await api.subsystems.create(data);
-      setSubsystems([...subsystems, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setSubsystems([...subsystems, enriched]);
       toast.success('Subsystem created successfully');
       return res.data;
     } catch (err) {
@@ -530,7 +570,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateSubsystem = async (id: number, data: Partial<Models.Subsystem>) => {
     try {
       const res = await api.subsystems.update(id, data);
-      setSubsystems(subsystems.map((s) => (s.id === id ? res.data : s)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setSubsystems(subsystems.map((s) => (s.id === id ? enriched : s)));
       toast.success('Subsystem updated successfully');
       return res.data;
     } catch (err) {
@@ -574,7 +615,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createModule = async (data: Partial<Models.Module>) => {
     try {
       const res = await api.modules.create(data);
-      setModules([...modules, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setModules([...modules, enriched]);
       toast.success('Module created successfully');
       return res.data;
     } catch (err) {
@@ -586,7 +628,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateModule = async (id: number, data: Partial<Models.Module>) => {
     try {
       const res = await api.modules.update(id, data);
-      setModules(modules.map((m) => (m.id === id ? res.data : m)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setModules(modules.map((m) => (m.id === id ? enriched : m)));
       toast.success('Module updated successfully');
       return res.data;
     } catch (err) {
@@ -630,7 +673,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createUnit = async (data: Partial<Models.Unit>) => {
     try {
       const res = await api.units.create(data);
-      setUnits([...units, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setUnits([...units, enriched]);
       toast.success('Unit created successfully');
       return res.data;
     } catch (err) {
@@ -642,7 +686,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateUnit = async (id: number, data: Partial<Models.Unit>) => {
     try {
       const res = await api.units.update(id, data);
-      setUnits(units.map((u) => (u.id === id ? res.data : u)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setUnits(units.map((u) => (u.id === id ? enriched : u)));
       toast.success('Unit updated successfully');
       return res.data;
     } catch (err) {
@@ -686,7 +731,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const createComponent = async (data: Partial<Models.Component>) => {
     try {
       const res = await api.components.create(data);
-      setComponents([...components, res.data]);
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setComponents([...components, enriched]);
       toast.success('Component created successfully');
       return res.data;
     } catch (err) {
@@ -698,7 +744,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateComponent = async (id: number, data: Partial<Models.Component>) => {
     try {
       const res = await api.components.update(id, data);
-      setComponents(components.map((c) => (c.id === id ? res.data : c)));
+      const enriched = enrichEntityWithStatus(res.data, statuses);
+      setComponents(components.map((c) => (c.id === id ? enriched : c)));
       toast.success('Component updated successfully');
       return res.data;
     } catch (err) {

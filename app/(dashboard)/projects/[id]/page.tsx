@@ -23,11 +23,16 @@ export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
   
-  const { projects, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
+  const {
+    projects,
+    systems,
+    orders,
+    loading,
+    createSystem,
+    deleteSystem,
+  } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
 
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
@@ -36,7 +41,6 @@ export default function ProjectDetailPage() {
   const project = projects.find((p) => String(p.id) === projectId);
   const projectSystems = project ? systems.filter((s) => s.project_id === project.id) : [];
   const order = project ? orders.find((o) => o.id === project.order_id) : null;
-
 
 
   const systemFormFields = [
@@ -255,6 +259,7 @@ export default function ProjectDetailPage() {
         onAdd={() => setIsAddOpen(true)}
         onDelete={handleDeleteSystem}
         detailPath={(id) => `/systems/${id}`}
+        secondaryPath={(id) => `/projects/${projectId}/systems/${id}/hierarchy`}
         addButtonLabel="Add System"
         emptyMessage="No systems yet. Click 'Add System' to create one."
       />

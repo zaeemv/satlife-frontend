@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, ArrowRight } from 'lucide-react';
+import { Plus, Trash2, ArrowRight, Network } from 'lucide-react';
 import { StatusBadge } from './status-badge';
 import Link from 'next/link';
 import { ConfirmDialog } from './confirm-dialog';
@@ -18,6 +18,8 @@ interface EntityCardsProps {
   onAdd: () => void;
   onDelete: (id: number) => void;
   detailPath: (id: number) => string;
+  secondaryPath?: (id: number) => string;
+  secondaryButtonLabel?: string;
   addButtonLabel?: string;
   emptyMessage?: string;
 }
@@ -29,6 +31,8 @@ export function EntityCards({
   onAdd,
   onDelete,
   detailPath,
+  secondaryPath,
+  secondaryButtonLabel = 'Hierarchy',
   addButtonLabel = 'Add New',
   emptyMessage = 'No entities found',
 }: EntityCardsProps) {
@@ -76,6 +80,14 @@ export function EntityCards({
                           <ArrowRight className="h-3 w-3" />
                         </Button>
                       </Link>
+                      {secondaryPath ? (
+                        <Link href={secondaryPath(entity.id)} className="flex-1">
+                          <Button variant="outline" size="sm" className="w-full gap-2">
+                            <Network className="h-3 w-3" />
+                            {secondaryButtonLabel}
+                          </Button>
+                        </Link>
+                      ) : null}
                       {/* <ConfirmDialog
                         title={`Delete ${entity.name}`}
                         description="This action cannot be undone."
