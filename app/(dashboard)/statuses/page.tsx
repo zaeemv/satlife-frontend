@@ -20,6 +20,7 @@ const STATUS_TYPES = [
   { key: "units", label: "Units" },
   { key: "components", label: "Components" },
   { key: "orders", label: "Orders" },
+  
 ] as const;
 
 export default function StatusesPage() {

@@ -6,34 +6,28 @@ import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ArrowLeft, FileText, Calendar, Layers } from 'lucide-react';
+import { ArrowLeft, FileText, Calendar, Layers, Pencil } from 'lucide-react';
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Edit, Trash2, Search, Clock, AlertTriangle, Zap, Pause, CheckCircle } from 'lucide-react';
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
 
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
-  
-  const {
-    projects,
-    systems,
-    orders,
-    loading,
-    createSystem,
-    deleteSystem,
-  } = useDataStore();
+  const { projects, systems, orders, loading, createSystem, deleteSystem, updateSystem } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
@@ -41,6 +35,7 @@ export default function ProjectDetailPage() {
   const project = projects.find((p) => String(p.id) === projectId);
   const projectSystems = project ? systems.filter((s) => s.project_id === project.id) : [];
   const order = project ? orders.find((o) => o.id === project.order_id) : null;
+
 
 
   const systemFormFields = [
@@ -58,26 +53,26 @@ export default function ProjectDetailPage() {
       required: false,
       placeholder: 'Enter system description',
     },
-    {
+    {  
       name: 'partnumber',
       label: 'Part #',
       type: 'text' as const,
       required: false,
       placeholder: 'Enter Part Number of System',
     },
-    // {
-    //   name: 'project_id',
-    //   label: 'Project',
-    //   type: 'select' as const,
-    //   required: true,
-    //   options: projects.map(p => ({ label: p.name, value: p.id })),
-    // },
     {
-      name: 'status_id',
+      name: 'project_id',
+      label: 'Project',
+      type: 'select' as const,
+      required: true,
+      options: projects.map(p => ({ label: p.name, value: p.id })),
+    },
+    {
+      name: 'id',
       label: 'Status',
       type: 'select' as const,
       required: true,
-      options: statuses.map(s => ({ label: s.name, value: s.id })),
+      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
     },
 
   ];
@@ -87,10 +82,10 @@ export default function ProjectDetailPage() {
       toast.error('Project not found');
       return;
     }
-    if (!formData.name.trim() || !formData.description || !formData.status_id) {
-      toast.error('Please fill in all required fields');
-      return;
-    }
+    if (!formData.name.trim() || !formData.description  || !formData.id) {
+          toast.error('Please fill in all required fields');
+          return;
+        }
     setIsSubmitting(true);
     try {
       console.log("my project ID is ", project.id)
@@ -98,11 +93,12 @@ export default function ProjectDetailPage() {
         name: formData.name,
         description: formData.description || '',
         project_id: formData.project_id ? Number(formData.project_id) : project.id,
-        status_id: Number(formData.status_id),
-        part_number: formData.partnumber,
+        status_id: Number(formData.id),
+        part_number:formData.partnumber,
         serial_number: formData.name && formData.partnumber
-          ? `${formData.name}-${formData.partnumber}`
-          : formData.name || formData.partnumber || ""
+                        ? `${formData.name}-${formData.partnumber}`
+                        : formData.name || formData.partnumber || "",
+        configuration_item: formData.partnumber || formData.name,
 
       });
       setIsAddOpen(false);
@@ -144,6 +140,27 @@ export default function ProjectDetailPage() {
       serial_number: nextSerialNumberFromInventory(item, projectSystems),
     });
   }
+  
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusRes, hierarchyRes] = await Promise.all([
+          api.statuses.list('systems'),
+          api.hierarchies.list('system'),
+        ]);
+        setStatuses(statusRes.data);
+        setSystemHierarchyNames(hierarchyRes.data);
+      } catch (err) {
+        console.error('Failed to fetch statuses or hierarchy names', err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   if (!project) {
     return (
@@ -155,26 +172,6 @@ export default function ProjectDetailPage() {
       </div>
     );
   }
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusRes, hierarchyRes] = await Promise.all([
-          api.statuses.list("systems"),
-          api.hierarchies.list("system"),
-        ]);
-        setStatuses(statusRes.data);
-        setSystemHierarchyNames(hierarchyRes.data);
-      } catch (err) {
-        console.error("Failed to fetch statuses or hierarchy names", err);
-      } finally {
-        setLoadingStatuses(false);
-      }
-    };
-
-    fetchData();
-  }, []);
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -246,11 +243,12 @@ export default function ProjectDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={project.status?.name || 'Unknown'} />
+              <StatusBadge status={project.status_name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>
       </div>
+
       {/* Systems Cards */}
       <EntityCards
         title="Systems"

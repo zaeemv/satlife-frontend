@@ -13,9 +13,23 @@ export interface User {
 // Customer
 export interface Customer {
   id: number
+  customer_code?: string
   name: string
-  contact_info: string
+  organization_type?: string | null
+  primary_contact_name?: string | null
+  designation?: string | null
+  email?: string | null
+  phone?: string | null
+  website?: string | null
+  address?: string | null
+  country?: string | null
+  notes?: string | null
+  status_id?: number;
+  created_by?: number | null
   created_at: string
+  updated_at: string
+  status_name: string
+
 }
 
 // Role
@@ -28,7 +42,7 @@ export interface Role {
 // Status
 export interface Status {
   id: number
-  name: string
+  status_name: string
   description: string
   status_type: string
 }
@@ -38,12 +52,54 @@ export interface Order {
   id: number
   customer_id: number
   order_number: string
-  status_id: number
+  title: string
+  description?: string | null
+  contract_number?: string | null
+  po_number?: string | null
+  order_date: string
+  delivery_date?: string | null
+  total_value?: number | null
+  currency: string
+  project_manager?: string | null
+  remarks?: string | null
+  status_id?: number | null
   created_at: string
   customer?: Customer
   status?: Status
+  status_name: string
 }
 
+export interface OrderCreate {
+  customer_id: number
+  order_number: string
+  title: string
+  description?: string
+  contract_number?: string
+  po_number?: string
+  order_date: string
+  delivery_date?: string
+  total_value?: number
+  currency?: string
+  project_manager?: string
+  remarks?: string
+  status_id?: number
+}
+
+export interface OrderUpdate {
+  customer_id?: number
+  order_number?: string
+  title?: string
+  description?: string
+  contract_number?: string
+  po_number?: string
+  order_date?: string
+  delivery_date?: string
+  total_value?: number
+  currency?: string
+  project_manager?: string
+  remarks?: string
+  status_id?: number
+}
 // Project
 export interface Project {
   id: number
@@ -54,11 +110,12 @@ export interface Project {
   owner_id: number
   order_id: number
   status_id: number
+  progress?: number
   created_at: string
   updated_at: string
   owner?: User
   order?: Order
-  status?: Status
+  status_name?: string
   systems?: System[]
 }
 
@@ -75,6 +132,9 @@ export interface System {
   created_at: string
   project?: Project
   status?: Status
+  status_name?: string
+
+
   
 }
 
@@ -152,21 +212,11 @@ export interface Hierarchy {
 // Inventory
 export interface Inventory {
   id: number
-  entity_id: number
-  name: string
-  inventory_type: string // 'system' | 'subsystem' | 'module' | 'unit' | 'component'
-  serial_number?: string
+  component_id: number
   quantity: number
-  description?: string
-  oem_name?: string
-  manufacturer_part_number?: string
   location: string
   created_at: string
   component?: Component
-  system?: System
-  subsystem?: Subsystem
-  module?: Module
-  unit?: Unit
 }
 
 // Entity (generic resource tracker)
@@ -219,12 +269,24 @@ export enum CaseStatus {
 }
 
 export enum FaultType {
-  Electrical = 'electrical',
-  Mechanical = 'mechanical',
-  Software = 'software',
-  Environmental = 'environmental',
-  Other = 'other',
+  // Electrical = 'electrical',
+  // Mechanical = 'mechanical',
+  // Software = 'software',
+  // Environmental = 'environmental',
+  // Other = 'other',
+  HARDWARE             = "hardware",
+  SOFTWARE             = "software",
+  PHYSICAL_DAMAGE      = "physical_damage",
+  WEAR                 = "wear",
+  MANUFACTURING_DEFECT = "manufacturing_defect",
+  UNCLASSIFIED         = "unclassified",
+  ELECTRICAL           = 'electrical',
+  MECHANICAL           = 'mechanical',
+  ENVIRONMENTAL        = 'environmental',
+  OTHER                = 'other',
 }
+
+                
 
 export enum FaultyEntityStatus {
   IDENTIFIED       = "identified",
@@ -234,12 +296,12 @@ export enum FaultyEntityStatus {
   HEALTHY          = "healthy",
   RESOLVED         = "resolved",
   NO_FAULT_FOUND   = "no_fault_found",
-  FALSEPOSITIVE = 'false_positive'
+  FALSEPOSITIVE    = 'false_positive'
 }
 
 export enum ResolutionType {
-  REPAIRED = 'repair',
-  REPLACED = 'replacement',
+  REPAIRED = 'repaired',
+  REPLACED = 'replaced',
   NO_FAULT_FOUND   = "no_fault_found",
   DECOMMISSIONED = "decommissioned",
   CLEAR = 'clear',
@@ -247,11 +309,12 @@ export enum ResolutionType {
 
 export enum ActionType {
   Inspection = 'inspection',
-  Diagnosis = 'diagnosis',
+  Disassembly = 'disassembly',
   Repair = 'repair',
   Replacement = 'replacement',
-  Adjustment = 'adjustment',
   Testing = 'testing',
+  Cleaning = 'cleaning',
+  Recalibration = 'recalibration',
 }
 
 export enum ActionOutcome {
@@ -289,12 +352,13 @@ export interface MaintenanceCase {
   project_id: number;
   description: string;
   status: CaseStatus;
+  status_id?: number;
   entity_id: number;
   entity_type: EntityType;
   part_number:string;
   reported_at: string;
   reported_by?: string;
-  reported_by_user?: string;
+  reported_by_user?: string | User;
   resolved_at?: string;
   resolution_notes?: string;
   created_at: string;
@@ -310,9 +374,10 @@ export interface FaultyEntity {
 
   entity_type: EntityType;
   entity_id: number;
-  fault_type: FaultType;
+  fault_type?: FaultType;
   fault_description?: string;
   status: FaultyEntityStatus;
+  status_id?: number;
   resolution_type?: ResolutionType;
   identified_at: string;
   resolved_at?: string;
@@ -341,12 +406,15 @@ export interface MaintenanceAction {
   created_at: string;
   updated_at: string;
   faulty_entity?: FaultyEntity;
+  replacement_entity_type?: EntityType;
+  replacement_entity_id?: number;
 }
 
 // Maintenance Delivery
 export interface MaintenanceDelivery {
   id: number;
   case_id: number;
+  status_id?: number;
   delivery_type: DeliveryType;
   status: DeliveryStatus;
   delivered_at?: string;
@@ -366,6 +434,7 @@ export interface CreateMaintenanceCasePayload {
   part_number?:string;
 }
 
+
 export interface UpdateMaintenanceCasePayload {
   status?: CaseStatus;
   resolution_notes?: string;
@@ -381,6 +450,8 @@ export interface CreateFaultyEntityPayload {
 export interface UpdateFaultyEntityPayload {
   status?: FaultyEntityStatus;
   resolution_type?: ResolutionType;
+  fault_type?: FaultType;
+  part_number?: string;
 }
 
 export interface CreateMaintenanceActionPayload {
@@ -416,8 +487,8 @@ export interface EntityLookupNode {
   entity_name: string;
   entity_PartNumber: string;
   entity_SerialNumber: string;
-  parent_ID: number;
-  parent_type: string;
+  parent_ID?: number;
+  parent_type?: string;
 }
 
 export interface EntityLookupResponse {
@@ -452,7 +523,8 @@ export interface lookUpResponse extends EntityLookupResponse {
 export interface SuspectChildrenPayload {
   entity_type: string;
   entity_id: number;
-  fault_type: string;
+  fault_type: FaultType;
+  entity_status: FaultyEntityStatus;
   fault_description?: string;
   entity_name: string;
   serial_number?: string;
@@ -487,4 +559,122 @@ export interface MaintenanceActionResponse {
 export interface MaintenanceDeliveryResponse {
   data: MaintenanceDelivery | MaintenanceDelivery[];
   error?: string;
+}
+
+
+export interface ConfigurationHistory {
+  id: number;
+
+  entity_id: number;
+  maintenance_case_id?: number | null;
+
+  performed_by: number;
+  approved_by?: number | null;
+  verified_by?: number | null;
+
+  change_date: string;
+  installation_date?: string | null;
+  removal_date?: string | null;
+
+  fault_type?: FaultType | null;
+  resolution_type: ResolutionType;
+
+  old_part_number?: string | null;
+  new_part_number?: string | null;
+
+  old_serial_number?: string | null;
+  new_serial_number?: string | null;
+
+  old_revision?: string | null;
+  new_revision?: string | null;
+
+  old_batch_number?: string | null;
+  new_batch_number?: string | null;
+
+  operating_hours?: number | null;
+  operating_cycles?: number | null;
+
+  work_order_number?: string | null;
+
+  reason?: string | null;
+  corrective_action?: string | null;
+  remarks?: string | null;
+
+  // Relationships
+  entity?: Entity;
+  maintenance_case?: MaintenanceCase | null;
+
+  performed_by_user?: User | null;
+  approved_by_user?: User | null;
+  verified_by_user?: User | null;
+}
+
+export interface CreateConfigurationHistoryPayload {
+  entity_id: number;
+  maintenance_case_id?: number;
+
+  performed_by: number;
+  approved_by?: number;
+  verified_by?: number;
+
+  installation_date?: string;
+  removal_date?: string;
+
+  fault_type?: FaultType;
+  resolution_type: ResolutionType;
+
+  old_part_number?: string;
+  new_part_number?: string;
+
+  old_serial_number?: string;
+  new_serial_number?: string;
+
+  old_revision?: string;
+  new_revision?: string;
+
+  old_batch_number?: string;
+  new_batch_number?: string;
+
+  operating_hours?: number;
+  operating_cycles?: number;
+
+  work_order_number?: string;
+
+  reason?: string;
+  corrective_action?: string;
+  remarks?: string;
+}
+
+export interface UpdateConfigurationHistoryPayload {
+  maintenance_case_id?: number;
+
+  approved_by?: number;
+  verified_by?: number;
+
+  installation_date?: string;
+  removal_date?: string;
+
+  fault_type?: FaultType;
+  resolution_type?: ResolutionType;
+
+  old_part_number?: string;
+  new_part_number?: string;
+
+  old_serial_number?: string;
+  new_serial_number?: string;
+
+  old_revision?: string;
+  new_revision?: string;
+
+  old_batch_number?: string;
+  new_batch_number?: string;
+
+  operating_hours?: number;
+  operating_cycles?: number;
+
+  work_order_number?: string;
+
+  reason?: string;
+  corrective_action?: string;
+  remarks?: string;
 }

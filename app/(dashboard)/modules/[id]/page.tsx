@@ -11,13 +11,12 @@ import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbP
 import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
-import { EntityInventorySearch } from '@/components/entity-inventory-search';
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import * as api from '@/lib/api';
 import * as Models from '@/lib/models';
-import type { Inventory } from '@/lib/models';
 import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
+import { EntityInventorySearch } from '@/components/entity-inventory-search';
 
 export default function ModuleDetailPage() {
   const params = useParams();
@@ -25,47 +24,15 @@ export default function ModuleDetailPage() {
   const { modules, loading, subsystems, units, createUnit, deleteUnit } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  
+
   const module = modules.find((m) => String(m.id) === moduleId);
   const subsystem = module ? subsystems.find((s) => s.id === module.subsystem_id) : null;
   const moduleUnits = module ? units.filter((u) => u.module_id === module.id) : [];
 
-  // Fetch statuses and hierarchy on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusRes, moduleHierarchyRes] = await Promise.all([
-          api.statuses.list("units"),
-          api.hierarchies.list("module"),
-        ]);
-        setStatuses(statusRes.data);
-        setModuleHierarchyNames(moduleHierarchyRes.data);
-
-        if (module) {
-          const parentHierarchyId = moduleHierarchyRes.data.find(
-            (hierarchy) => hierarchy.name === module.name
-          )?.id;
-
-          if (parentHierarchyId) {
-            const childRes = await api.hierarchies.list("unit", parentHierarchyId);
-            setUnitHierarchyNames(childRes.data);
-          } else {
-            setUnitHierarchyNames([]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch statuses or hierarchy names", err);
-      } finally {
-        setLoadingStatuses(false);
-      }
-    };
-
-    fetchData();
-  }, [module]);
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
 
   const unitFormFields = [
     {
@@ -90,11 +57,11 @@ export default function ModuleDetailPage() {
       placeholder: 'Enter Part Number of Unit',
     },
     {
-      name: 'status_id',
+      name: 'id',
       label: 'Status',
       type: 'select' as const,
       required: true,
-      options: statuses.map(s => ({ label: s.name, value: s.id })),
+      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
     },
   ];
 
@@ -109,11 +76,11 @@ export default function ModuleDetailPage() {
         name: formData.name,
         description: formData.description || '',
         module_id: module.id,
-        status_id: Number(formData.status_id),
-        part_number:formData.partnumber,
+        status_id: Number(formData.id),
+        part_number: formData.partnumber,
         serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || ""
+          ? `${formData.name}-${formData.partnumber}`
+          : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Unit added successfully');
@@ -155,6 +122,39 @@ export default function ModuleDetailPage() {
     });
   }
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusRes, moduleHierarchyRes] = await Promise.all([
+          api.statuses.list("units"),
+          api.hierarchies.list("module"),
+        ]);
+        setStatuses(statusRes.data);
+        setModuleHierarchyNames(moduleHierarchyRes.data);
+
+        if (module) {
+          const parentHierarchyId = moduleHierarchyRes.data.find(
+            (hierarchy) => hierarchy.name === module.name
+          )?.id;
+
+          if (parentHierarchyId) {
+            const childRes = await api.hierarchies.list("unit", parentHierarchyId);
+            setUnitHierarchyNames(childRes.data);
+          } else {
+            setUnitHierarchyNames([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch statuses or hierarchy names", err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, [module]);
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
+
   if (!module) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -166,8 +166,6 @@ export default function ModuleDetailPage() {
     );
   }
 
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
- 
   return (
     <div className="space-y-6">
       <Breadcrumb>
@@ -222,7 +220,7 @@ export default function ModuleDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={module.status?.name || 'Unknown'} />
+              <StatusBadge status={module.status?.status_name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>
@@ -258,7 +256,7 @@ export default function ModuleDetailPage() {
         allowedInventoryNames={unitHierarchyNames.map((hierarchy) => hierarchy.name)}
         onUseInventory={handleUseInventory}
       />
-
+      
       {/* Add Unit Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="max-w-md">

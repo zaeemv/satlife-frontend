@@ -12,62 +12,30 @@ import { StatusBadge } from '@/components/status-badge';
 import { EntityCards } from '@/components/entity-cards';
 import { EntityForm } from '@/components/entity-form';
 import { EntityInventorySearch } from '@/components/entity-inventory-search';
-import { useState,useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
+import axios from 'axios';
 import * as api from '@/lib/api';
+import { fetchStatusesByType } from '@/lib/api';
 import * as Models from '@/lib/models';
 import type { Inventory } from '@/lib/models';
 import { getChildInventoryType, nextSerialNumberFromInventory } from '@/lib/entity-hierarchy';
+import { resolveStatusName } from '@/lib/entity-status';
 
 export default function SystemDetailPage() {
   const params = useParams();
   const systemId = params.id as string;
-  const { systems, projects,loading, subsystems, createSubsystem, deleteSubsystem } = useDataStore();
+  const { systems, projects, loading, subsystems, createSubsystem, deleteSubsystem, statuses: storeStatuses } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const system = systems.find((s) => String(s.id) === systemId);
+  const project = system ? projects.find((p) => p.id === system.project_id) : null;
+  const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [systemHierarchyNames, setSystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  
-  const system = systems.find((s) => String(s.id) === systemId);
-  const project = system ? projects.find((p) => p.id === system.project_id) : null;
-  const systemSubsystems = system ? subsystems.filter((sub) => sub.system_id === system.id) : [];
-
-  // Fetch statuses and hierarchy on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusRes, systemHierarchyRes] = await Promise.all([
-          api.statuses.list("subsystems"),
-          api.hierarchies.list("system"),
-        ]);
-
-        setStatuses(statusRes.data);
-        setSystemHierarchyNames(systemHierarchyRes.data);
-
-        if (system) {
-          const parentHierarchyId = systemHierarchyRes.data.find(
-            (hierarchy) => hierarchy.name === system.name
-          )?.id;
-
-          if (parentHierarchyId) {
-            const childRes = await api.hierarchies.list("subsystem", parentHierarchyId);
-            setSubsystemHierarchyNames(childRes.data);
-          } else {
-            setSubsystemHierarchyNames([]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch statuses or hierarchy names", err);
-      } finally {
-        setLoadingStatuses(false);
-      }
-    };
-
-    fetchData();
-  }, [system]);
-
   const subsystemFormFields = [
     {
       name: 'name',
@@ -91,13 +59,13 @@ export default function SystemDetailPage() {
       placeholder: 'Enter Part Number of SubSystem',
     },
     {
-      name: 'status_id',
+      name: 'id',
       label: 'Status',
       type: 'select' as const,
       required: true,
-      options: statuses.map(s => ({ label: s.name, value: s.id })),
+      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
     },
-    
+
   ];
 
   async function handleAddSubsystem(formData: Record<string, any>) {
@@ -111,17 +79,28 @@ export default function SystemDetailPage() {
         name: formData.name,
         description: formData.description || '',
         system_id: system.id,
-        status_id: Number(formData.status_id),
-        part_number:formData.partnumber,
+        status_id: Number(formData.id),
+        part_number: formData.partnumber,
         serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || ""
+          ? `${formData.name}-${formData.partnumber}`
+          : formData.name || formData.partnumber || "",
+        configuration_item: formData.partnumber || formData.name,
       });
       setIsAddOpen(false);
       toast.success('Subsystem added successfully');
     } catch (error) {
       console.error('[v0] Subsystem creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add subsystem';
+      let errorMessage = 'Failed to add subsystem';
+      if (axios.isAxiosError(error)) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'string') {
+          errorMessage = detail;
+        } else if (Array.isArray(detail)) {
+          errorMessage = detail.map((item) => item.msg || JSON.stringify(item)).join(', ');
+        }
+      } else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -156,6 +135,50 @@ export default function SystemDetailPage() {
       serial_number: nextSerialNumberFromInventory(item, systemSubsystems),
     });
   }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusResult, hierarchyResult] = await Promise.allSettled([
+          fetchStatusesByType('subsystems'),
+          api.hierarchies.list('system'),
+        ]);
+
+        if (statusResult.status === 'fulfilled') {
+          setStatuses(statusResult.value);
+        }
+
+        if (hierarchyResult.status === 'fulfilled') {
+          setSystemHierarchyNames(hierarchyResult.value.data);
+
+          if (system) {
+            const parentHierarchyId = hierarchyResult.value.data.find(
+              (hierarchy) => hierarchy.name === system.name
+            )?.id;
+
+            if (parentHierarchyId) {
+              try {
+                const childRes = await api.hierarchies.list('subsystem', parentHierarchyId);
+                setSubsystemHierarchyNames(childRes.data);
+              } catch (childError) {
+                console.error('Failed to fetch subsystem hierarchy names', childError);
+                setSubsystemHierarchyNames([]);
+              }
+            } else {
+              setSubsystemHierarchyNames([]);
+            }
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch statuses or hierarchy names', err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, [system]);
+
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   if (!system) {
     return (
@@ -167,8 +190,6 @@ export default function SystemDetailPage() {
       </div>
     );
   }
-
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -218,7 +239,7 @@ export default function SystemDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={system.status?.name || 'Unknown'} />
+              <StatusBadge status={resolveStatusName(system, storeStatuses.length ? storeStatuses : statuses)} />
             </div>
           </CardContent>
         </Card>
@@ -240,6 +261,7 @@ export default function SystemDetailPage() {
         title="Subsystems"
         description={`Manage subsystems for ${system.name}`}
         entities={systemSubsystems}
+        statuses={storeStatuses.length ? storeStatuses : statuses}
         onAdd={() => setIsAddOpen(true)}
         onDelete={handleDeleteSubsystem}
         detailPath={(id) => `/subsystems/${id}`}

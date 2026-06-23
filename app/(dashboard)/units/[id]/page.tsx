@@ -25,16 +25,111 @@ export default function UnitDetailPage() {
   const { units, loading, modules, components, createComponent, deleteComponent } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [statuses, setStatuses] = useState<Models.Status[]>([]);
-  const [loadingStatuses, setLoadingStatuses] = useState(true);
-  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  
+
   const unit = units.find((u) => String(u.id) === unitId);
   const module = unit ? modules.find((m) => m.id === unit.module_id) : null;
   const unitComponents = unit ? components.filter((c) => c.unit_id === unit.id) : [];
 
-  // Fetch statuses and hierarchy on mount
+  const [statuses, setStatuses] = useState<Models.Status[]>([]);
+  const [loadingStatuses, setLoadingStatuses] = useState(true);
+  const [unitHierarchyNames, setUnitHierarchyNames] = useState<Models.Hierarchy[]>([]);
+  const [componentHierarchyNames, setComponentHierarchyNames] = useState<Models.Hierarchy[]>([]);
+
+  const componentFormFields = [
+    {
+      name: 'name',
+      label: 'Component Name',
+      type: 'select' as const,
+      required: true,
+      options: componentHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
+    },
+    {
+      name: 'description',
+      label: 'Description',
+      type: 'textarea' as const,
+      required: false,
+      placeholder: 'Enter component description',
+    },
+    {
+      name: 'partnumber',
+      label: 'Part #',
+      type: 'text' as const,
+      required: false,
+      placeholder: 'Enter Part Number of Component',
+    },
+    // {
+    //   name: 'sku',
+    //   label: 'SKU',
+    //   type: 'text' as const,
+    //   required: false,
+    //   placeholder: 'Enter component SKU',
+    // },
+    {
+      name: 'id',
+      label: 'Status',
+      type: 'select' as const,
+      required: true,
+      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
+    },
+  ];
+
+  async function handleAddComponent(formData: Record<string, any>) {
+    if (!unit) {
+      toast.error('Unit not found');
+      return;
+    }
+    setIsSubmitting(true);
+    try {
+      await createComponent({
+        name: formData.name,
+        description: formData.description || '',
+        sku: formData.sku || '',
+        unit_id: unit.id,
+        status_id: Number(formData.id),
+        part_number: formData.partnumber,
+        serial_number: formData.name && formData.partnumber
+          ? `${formData.name}-${formData.partnumber}`
+          : formData.name || formData.partnumber || ""
+      });
+      setIsAddOpen(false);
+      toast.success('Component added successfully');
+    } catch (error) {
+      console.error('[v0] Component creation error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to add component';
+      toast.error(errorMessage);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  async function handleDeleteComponent(id: number) {
+    try {
+      await deleteComponent(id);
+      toast.success('Component deleted successfully');
+    } catch {
+      toast.error('Failed to delete component');
+    }
+  }
+  async function handleUseInventory(item: Inventory) {
+    if (!unit) {
+      throw new Error('Unit not found');
+    }
+
+    const defaultStatus = statuses[0];
+    if (!defaultStatus) {
+      throw new Error('No component status available');
+    }
+
+    await createComponent({
+      name: item.name,
+      description: item.description || '',
+      sku: '',
+      unit_id: unit.id,
+      status_id: defaultStatus.id,
+      part_number: item.manufacturer_part_number || '',
+      serial_number: nextSerialNumberFromInventory(item, unitComponents),
+    });
+  }
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -66,103 +161,8 @@ export default function UnitDetailPage() {
 
     fetchData();
   }, [unit]);
-  
-  const componentFormFields = [
-    {
-      name: 'name',
-      label: 'Component Name',
-      type: 'select' as const,
-      required: true,
-      options: componentHierarchyNames.map((hierarchy) => ({ label: hierarchy.name, value: hierarchy.name })),
-    },
-    {
-      name: 'description',
-      label: 'Description',
-      type: 'textarea' as const,
-      required: false,
-      placeholder: 'Enter component description',
-    },
-    {
-      name: 'partnumber',
-      label: 'Part #',
-      type: 'text' as const,
-      required: false,
-      placeholder: 'Enter Part Number of Component',
-    },
-    // {
-    //   name: 'sku',
-    //   label: 'SKU',
-    //   type: 'text' as const,
-    //   required: false,
-    //   placeholder: 'Enter component SKU',
-    // },
-    {
-      name: 'status_id',
-      label: 'Status',
-      type: 'select' as const,
-      required: true,
-      options: statuses.map(s => ({ label: s.name, value: s.id })),
-    },
-  ];
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
-  async function handleAddComponent(formData: Record<string, any>) {
-    if (!unit) {
-      toast.error('Unit not found');
-      return;
-    }
-    setIsSubmitting(true);
-    try {
-      await createComponent({
-        name: formData.name,
-        description: formData.description || '',
-        sku: formData.sku || '',
-        unit_id: unit.id,
-        status_id: Number(formData.status_id),
-        part_number:formData.partnumber,
-        serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || ""
-      });
-      setIsAddOpen(false);
-      toast.success('Component added successfully');
-    } catch (error) {
-      console.error('[v0] Component creation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to add component';
-      toast.error(errorMessage);
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
-
-  async function handleDeleteComponent(id: number) {
-    try {
-      await deleteComponent(id);
-      toast.success('Component deleted successfully');
-    } catch {
-      toast.error('Failed to delete component');
-    }
-  }
-
-  async function handleUseInventory(item: Inventory) {
-    if (!unit) {
-      throw new Error('Unit not found');
-    }
-
-    const defaultStatus = statuses[0];
-    if (!defaultStatus) {
-      throw new Error('No component status available');
-    }
-
-    await createComponent({
-      name: item.name,
-      description: item.description || '',
-      sku: '',
-      unit_id: unit.id,
-      status_id: defaultStatus.id,
-      part_number: item.manufacturer_part_number || '',
-      serial_number: nextSerialNumberFromInventory(item, unitComponents),
-    });
-  }
 
   if (!unit) {
     return (
@@ -174,8 +174,6 @@ export default function UnitDetailPage() {
       </div>
     );
   }
-
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -231,7 +229,7 @@ export default function UnitDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={unit.status?.name || 'Unknown'} />
+              <StatusBadge status={unit.status?.status_name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>

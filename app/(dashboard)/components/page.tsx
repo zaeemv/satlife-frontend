@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useDataStore } from '@/lib/data-store';
 import { Button } from '@/components/ui/button';
@@ -10,27 +10,32 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTrigger, DialogTitle } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Search, Clock, AlertCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, Edit, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '@/components/status-badge';
-import { ConfirmDialog } from '@/components/confirm-dialog';
 import Link from 'next/link';
 import * as api from '@/lib/api';
-import type { Hierarchy } from '@/lib/models';
-
-const COMPONENT_STATUSES = {
-  'Procured': { icon: Clock, color: 'text-blue-500' },
-  'In Inspection': { icon: AlertCircle, color: 'text-orange-500' },
-  'Approved': { icon: CheckCircle2, color: 'text-green-500' },
-  'Rejected': { icon: XCircle, color: 'text-red-500' },
-};
+import type { Component, Hierarchy } from '@/lib/models';
+import { getInventoryQuantityByComponentId, getCount } from '@/lib/entity-counts';
+import { EntityCountCell } from '@/components/entity-count-cell';
+import { EntityNameWithFault } from '@/components/entity-fault-ping';
+import { useEntityFaultMap } from '@/hooks/use-entity-fault-map';
+import { HierarchyListDashboard } from '@/components/hierarchy/hierarchy-list-dashboard';
+import { buildHierarchyPageUrl } from '@/lib/hierarchy-page-filters';
+import {
+  COMPONENTS_DASHBOARD_CONFIG,
+  COMPONENT_STATUS_NAMES,
+} from '@/lib/hierarchy-dashboard-configs';
 
 export default function ComponentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { components, units, loading, createComponent, updateComponent, deleteComponent } = useDataStore();
+  const { components, units, inventory, loading, createComponent, updateComponent, deleteComponent } = useDataStore();
+  const faultMap = useEntityFaultMap();
   const statusFilterParam = searchParams.get('status');
+  const parentFilterParam = searchParams.get('unit_id');
   const [statusFilter, setStatusFilter] = useState<string>(statusFilterParam || 'all');
+  const [parentFilter, setParentFilter] = useState<string>(parentFilterParam || 'all');
   const [search, setSearch] = useState('');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
@@ -84,19 +89,41 @@ export default function ComponentsPage() {
     fetchComponentNames();
   }, [formData.unit_id, unitHierarchyNames, units]);
 
+  const inventoryQtyByComponent = useMemo(
+    () => getInventoryQuantityByComponentId(inventory),
+    [inventory]
+  );
+
+  const getStatusName = (component: Component) => component.status?.status_name || 'Unknown';
+
   const filtered = components.filter((c) => {
     const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) ||
-      c.description?.toLowerCase().includes(search.toLowerCase()) ||
-      c.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
-      c.part_number?.toLowerCase().includes(search.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || c.status?.name === statusFilter;
-    return matchesSearch && matchesStatus;
+      c.description?.toLowerCase().includes(search.toLowerCase());
+    const matchesStatus = statusFilter === 'all' || getStatusName(c) === statusFilter;
+    const matchesParent =
+      parentFilter === 'all' || c.unit_id?.toString() === parentFilter;
+    return matchesSearch && matchesStatus && matchesParent;
   });
 
-  const statusCounts = Object.keys(COMPONENT_STATUSES).reduce((acc, status) => {
-    acc[status] = components.filter(c => c.status?.name === status).length;
-    return acc;
-  }, {} as Record<string, number>);
+  const filteredParent = useMemo(
+    () => (parentFilter === 'all' ? null : units.find((u) => String(u.id) === parentFilter)),
+    [parentFilter, units]
+  );
+
+  const applyStatusFilter = (statusName: string) => {
+    setStatusFilter(statusName);
+    router.push(buildHierarchyPageUrl('/components', statusName, parentFilter, 'unit_id'));
+  };
+
+  const applyParentFilter = (parentId: string) => {
+    setParentFilter(parentId);
+    router.push(buildHierarchyPageUrl('/components', statusFilter, parentId, 'unit_id'));
+  };
+
+  useEffect(() => {
+    setStatusFilter(statusFilterParam || 'all');
+    setParentFilter(parentFilterParam || 'all');
+  }, [statusFilterParam, parentFilterParam]);
 
   async function handleCreate() {
     if (!formData.name.trim() || !formData.unit_id) {
@@ -173,65 +200,83 @@ export default function ComponentsPage() {
         <p className="text-muted-foreground mt-2">Manage unit components and parts</p>
       </div>
 
-      {/* Status Breakdown */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Status Overview</CardTitle>
-          <CardDescription>Click to filter by status</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-            <button
-              onClick={() => {
-                setStatusFilter('all');
-                router.push('/components');
-              }}
-              className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === 'all' ? 'ring-2 ring-primary rounded-lg' : ''}`}
-            >
-              <Card className={`hover:shadow-lg ${statusFilter === 'all' ? 'bg-accent' : ''}`}>
-                <CardContent className="pt-6">
-                  <p className="text-sm font-medium text-muted-foreground">All Components</p>
-                  <p className="text-2xl font-bold">{components.length}</p>
-                </CardContent>
-              </Card>
-            </button>
+      <HierarchyListDashboard
+        config={COMPONENTS_DASHBOARD_CONFIG}
+        items={components}
+        parents={units}
+        children={inventory}
+        getChildParentId={(item) => item.component_id}
+        getStatusName={getStatusName}
+        getParentId={(component) => component.unit_id}
+        faultMap={faultMap}
+        activeStatusName={statusFilter}
+        activeParentId={parentFilter}
+        onStatusFilter={applyStatusFilter}
+        onParentFilter={applyParentFilter}
+      />
 
-            {Object.entries(COMPONENT_STATUSES).map(([statusName, { icon: Icon, color }]) => (
-              <button
-                key={statusName}
-                onClick={() => {
-                  setStatusFilter(statusName);
-                  router.push(`/components?status=${encodeURIComponent(statusName)}`);
-                }}
-                className={`text-left cursor-pointer transition-transform hover:scale-105 ${statusFilter === statusName ? 'ring-2 ring-primary rounded-lg' : ''}`}
-              >
-                <Card className={`hover:shadow-lg ${statusFilter === statusName ? 'bg-accent' : ''}`}>
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground">{statusName}</p>
-                        <p className="text-2xl font-bold">{statusCounts[statusName] || 0}</p>
-                      </div>
-                      <Icon className={`h-8 w-8 ${color}`} />
-                    </div>
-                  </CardContent>
-                </Card>
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      {(statusFilter !== 'all' || parentFilter !== 'all') && (
+        <div className="flex flex-wrap items-center gap-2">
+          {statusFilter !== 'all' && (
+            <span className="rounded-full border bg-muted px-3 py-1 text-sm">
+              Status: <strong>{statusFilter}</strong>
+            </span>
+          )}
+          {filteredParent && (
+            <span className="rounded-full border bg-muted px-3 py-1 text-sm">
+              Unit: <strong>{filteredParent.name}</strong>
+            </span>
+          )}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setStatusFilter('all');
+              setParentFilter('all');
+              router.push('/components');
+            }}
+          >
+            Clear filters
+          </Button>
+        </div>
+      )}
 
-      <div className="flex gap-4 items-center">
+      <div className="flex gap-4 items-center flex-wrap">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            placeholder="Search by name, serial number, or part number..."
+            placeholder="Search components..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-10"
           />
         </div>
+        <Select value={statusFilter} onValueChange={applyStatusFilter}>
+          <SelectTrigger className="w-44">
+            <SelectValue placeholder="Filter by status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Statuses</SelectItem>
+            {COMPONENT_STATUS_NAMES.map((name) => (
+              <SelectItem key={name} value={name}>
+                {name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={parentFilter} onValueChange={applyParentFilter}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="Filter by unit" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Units</SelectItem>
+            {units.map((u) => (
+              <SelectItem key={u.id} value={u.id.toString()}>
+                {u.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
@@ -313,13 +358,14 @@ export default function ComponentsPage() {
                   <TableHead>Name</TableHead>
                   <TableHead>Unit</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Inventory Qty</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                       No components found
                     </TableCell>
                   </TableRow>
@@ -328,10 +374,23 @@ export default function ComponentsPage() {
                     const unit = units.find((u) => u.id === component.unit_id);
                     return (
                       <TableRow key={component.id} onClick={() => router.push(`/components/${component.id}`)}>
-                        <TableCell className="font-medium">{component.name}</TableCell>
+                        <TableCell className="font-medium">
+                          <EntityNameWithFault
+                            name={component.name}
+                            entityType="component"
+                            entityId={component.id}
+                            faultMap={faultMap}
+                          />
+                        </TableCell>
                         <TableCell>{unit?.name || 'N/A'}</TableCell>
                         <TableCell>
-                          <StatusBadge status={component.status?.name || 'Unknown'} />
+                          <StatusBadge status={getStatusName(component)} />
+                        </TableCell>
+                        <TableCell>
+                          <EntityCountCell
+                            count={getCount(inventoryQtyByComponent, component.id)}
+                            label="Inventory quantity"
+                          />
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex gap-2 justify-end">

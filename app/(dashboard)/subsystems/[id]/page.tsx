@@ -25,48 +25,14 @@ export default function SubsystemDetailPage() {
   const { subsystems, loading, systems, modules, createModule, deleteModule } = useDataStore();
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const subsystem = subsystems.find((s) => String(s.id) === subsystemId);
+  const system = subsystem ? systems.find((s) => s.id === subsystem.system_id) : null;
+  const subsystemModules = subsystem ? modules.filter((m) => m.subsystem_id === subsystem.id) : [];
   const [statuses, setStatuses] = useState<Models.Status[]>([]);
   const [loadingStatuses, setLoadingStatuses] = useState(true);
   const [subsystemHierarchyNames, setSubsystemHierarchyNames] = useState<Models.Hierarchy[]>([]);
   const [moduleHierarchyNames, setModuleHierarchyNames] = useState<Models.Hierarchy[]>([]);
-  
-  const subsystem = subsystems.find((s) => String(s.id) === subsystemId);
-  const system = subsystem ? systems.find((s) => s.id === subsystem.system_id) : null;
-  const subsystemModules = subsystem ? modules.filter((m) => m.subsystem_id === subsystem.id) : [];
-
-  // Fetch statuses and hierarchy on mount
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statusRes, subsystemHierarchyRes] = await Promise.all([
-          api.statuses.list("modules"),
-          api.hierarchies.list("subsystem"),
-        ]);
-        setStatuses(statusRes.data);
-        setSubsystemHierarchyNames(subsystemHierarchyRes.data);
-
-        if (subsystem) {
-          const parentHierarchyId = subsystemHierarchyRes.data.find(
-            (hierarchy) => hierarchy.name === subsystem.name
-          )?.id;
-
-          if (parentHierarchyId) {
-            const childRes = await api.hierarchies.list("module", parentHierarchyId);
-            setModuleHierarchyNames(childRes.data);
-          } else {
-            setModuleHierarchyNames([]);
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch statuses or hierarchy names", err);
-      } finally {
-        setLoadingStatuses(false);
-      }
-    };
-
-    fetchData();
-  }, [subsystem]);
-
   const moduleFormFields = [
     {
       name: 'name',
@@ -90,11 +56,11 @@ export default function SubsystemDetailPage() {
       placeholder: 'Enter Part Number of Module',
     },
     {
-      name: 'status_id',
+      name: 'id',
       label: 'Status',
       type: 'select' as const,
       required: true,
-      options: statuses.map(s => ({ label: s.name, value: s.id })),
+      options: statuses.map(s => ({ label: s.status_name, value: s.id })),
     },
   ];
 
@@ -109,11 +75,11 @@ export default function SubsystemDetailPage() {
         name: formData.name,
         description: formData.description || '',
         subsystem_id: subsystem.id,
-        status_id: Number(formData.status_id),
-        part_number:formData.partnumber,
+        status_id: Number(formData.id),
+        part_number: formData.partnumber,
         serial_number: formData.name && formData.partnumber
-                        ? `${formData.name}-${formData.partnumber}`
-                        : formData.name || formData.partnumber || ""
+          ? `${formData.name}-${formData.partnumber}`
+          : formData.name || formData.partnumber || ""
       });
       setIsAddOpen(false);
       toast.success('Module added successfully');
@@ -155,6 +121,40 @@ export default function SubsystemDetailPage() {
     });
   }
 
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [statusRes, subsystemHierarchyRes] = await Promise.all([
+          api.statuses.list('modules'),
+          api.hierarchies.list('subsystem'),
+        ]);
+        setStatuses(statusRes.data);
+        setSubsystemHierarchyNames(subsystemHierarchyRes.data);
+
+        if (subsystem) {
+          const parentHierarchyId = subsystemHierarchyRes.data.find(
+            (hierarchy) => hierarchy.name === subsystem.name
+          )?.id;
+
+          if (parentHierarchyId) {
+            const childRes = await api.hierarchies.list('module', parentHierarchyId);
+            setModuleHierarchyNames(childRes.data);
+          } else {
+            setModuleHierarchyNames([]);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch statuses or hierarchy names', err);
+      } finally {
+        setLoadingStatuses(false);
+      }
+    };
+
+    fetchData();
+  }, [subsystem]);
+
+  if (loading) return <div className="p-8 text-center">Loading...</div>;
+
   if (!subsystem) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
@@ -165,8 +165,6 @@ export default function SubsystemDetailPage() {
       </div>
     );
   }
-
-  if (loading) return <div className="p-8 text-center">Loading...</div>;
 
   return (
     <div className="space-y-6">
@@ -222,7 +220,7 @@ export default function SubsystemDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={subsystem.status?.name || 'Unknown'} />
+              <StatusBadge status={subsystem.status?.status_name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>

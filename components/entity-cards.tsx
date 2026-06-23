@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, ArrowRight, Network } from 'lucide-react';
 import { StatusBadge } from './status-badge';
+import { resolveStatusName } from '@/lib/entity-status';
+import type { Status } from '@/lib/models';
 import Link from 'next/link';
 import { ConfirmDialog } from './confirm-dialog';
 
@@ -12,9 +14,12 @@ interface EntityCardsProps {
   entities: Array<{
     id: number;
     name: string;
-    status?: { name: string };
+    status_id?: number;
+    status_name?: string;
+    status?: { status_name: string };
     description?: string;
   }>;
+  statuses?: Status[];
   onAdd: () => void;
   onDelete: (id: number) => void;
   detailPath: (id: number) => string;
@@ -35,6 +40,7 @@ export function EntityCards({
   secondaryButtonLabel = 'Hierarchy',
   addButtonLabel = 'Add New',
   emptyMessage = 'No entities found',
+  statuses = [],
 }: EntityCardsProps) {
   return (
     <Card>
@@ -55,7 +61,9 @@ export function EntityCards({
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {entities.map((entity) => (
+            {entities.map((entity) => {
+              const statusLabel = resolveStatusName(entity, statuses);
+              return (
               <Card key={entity.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="pt-6">
                   <div className="space-y-3">
@@ -68,8 +76,8 @@ export function EntityCards({
                           </p>
                         )}
                       </div>
-                      {entity.status && (
-                        <StatusBadge status={entity.status.name} />
+                      {statusLabel !== 'Unknown' && (
+                        <StatusBadge status={statusLabel} />
                       )}
                     </div>
 
@@ -101,7 +109,8 @@ export function EntityCards({
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
         )}
       </CardContent>

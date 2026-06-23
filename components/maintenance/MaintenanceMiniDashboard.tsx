@@ -10,7 +10,7 @@ interface StatusCount {
   status: string;
   count: number;
   icon: LucideIcon;
-  color: 'blue' | 'green' | 'red' | 'amber' | 'orange' | 'slate';
+  color: 'blue' | 'green' | 'red' | 'amber' | 'orange' | 'slate' | 'emerald';
 }
 
 interface MaintenanceMiniDashboardProps {
@@ -26,7 +26,7 @@ export function MaintenanceMiniDashboard({cases, onStatusFilter}: MaintenanceMin
       status: 'Total',
       count: totalCount,
       icon: Package,
-      color: 'blue',
+      color: 'emerald',
     },
     {
       status: 'open',
@@ -68,20 +68,9 @@ export function MaintenanceMiniDashboard({cases, onStatusFilter}: MaintenanceMin
 
   return (
     <div className="">
-        {/* <div>
-          <KPICard
-            title="Total Cases"
-            value={totalCount}
-            change={0}
-            icon={Package}
-            accentColor="blue"
-          />
-        </div> */}
-          
+         {statusCounts.length > 0 && (
 
-          {statusCounts.length > 0 && (
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:grid-cols-6 border-4 items-stretch">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 lg:grid-cols-6 items-stretch">
             {statusCounts.map((item) => (
               <button
                 key={item.status}
@@ -95,7 +84,7 @@ export function MaintenanceMiniDashboard({cases, onStatusFilter}: MaintenanceMin
                 <KPICard
                   title={item.status.replace(/_/g, ' ').charAt(0).toUpperCase() + item.status.replace(/_/g, ' ').slice(1)}
                   value={item.count}
-                  change={0}
+                  change={item.status != 'Total'? Math.round(100* item.count/totalCount):0}
                   icon={item.icon}
                   accentColor={item.color}
                 />
@@ -108,45 +97,3 @@ export function MaintenanceMiniDashboard({cases, onStatusFilter}: MaintenanceMin
   );
 }
 
-
-
-
-  // return (
-  //   <div className="flex space-y-4">
-  //     <Card className="p-3 border">
-  //       <h3 className="text-lg font-semibold mb-2">Overview</h3>
-  //       <div className="grid grid-cols-1 gap-2">
-  //         <KPICard
-  //           title="Total Cases"
-  //           value={totalCount}
-  //           change={0}
-  //           icon={Package}
-  //           accentColor="blue"
-  //         />
-  //       </div>
-  //     </Card>
-
-  //     {statusCounts.length > 0 && (
-  //       <Card className="p-6">
-  //         <h3 className="text-lg font-semibold mb-4">Status Breakdown</h3>
-  //         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-  //           {statusCounts.map((item) => (
-  //             <button
-  //               key={item.status}
-  //               onClick={() => handleStatusClick(item.status)}
-  //               className="cursor-pointer transition-transform hover:scale-105"
-  //             >
-  //               <KPICard
-  //                 title={item.status.replace(/_/g, ' ').charAt(0).toUpperCase() + item.status.replace(/_/g, ' ').slice(1)}
-  //                 value={item.count}
-  //                 change={0}
-  //                 icon={item.icon}
-  //                 accentColor={item.color}
-  //               />
-  //             </button>
-  //           ))}
-  //         </div>
-  //       </Card>
-  //     )}
-  //   </div>
-  // );

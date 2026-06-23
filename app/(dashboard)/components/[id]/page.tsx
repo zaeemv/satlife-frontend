@@ -111,7 +111,7 @@ export default function ComponentDetailPage() {
             </div>
             <div>
               <p className="text-xs text-muted-foreground">Status</p>
-              <StatusBadge status={component.status?.name || 'Unknown'} />
+              <StatusBadge status={component.status?.status_name || 'Unknown'} />
             </div>
           </CardContent>
         </Card>
@@ -133,7 +133,7 @@ export default function ComponentDetailPage() {
               <div>
                 <p className="text-sm text-muted-foreground">Status</p>
                 <div className="mt-1">
-                  <StatusBadge status={component.status?.name || 'Unknown'} />
+                  <StatusBadge status={component.status?.status_name || 'Unknown'} />
                 </div>
               </div>
             </div>
